@@ -1,69 +1,217 @@
 # RBAC (Role-Based Access Control)
 
-> **Ponto-chave:** Kubernetes **não gerencia** contas de usuário e grupo. Em vez disso, espera que certificados sejam criados e autorizados por uma Autoridade Certificadora (CA) externa. Usuários e grupos são representados por campos nos certificados, não como objetos no cluster.
+RBAC is the authorization mechanism used by Kubernetes to control who can do what on which resources. It is enabled by default since Kubernetes 1.8 and is the recommended approach for access control.
+
+> **Key point:** Kubernetes does **not manage** user accounts or groups. Instead, it expects certificates to be created and signed by a trusted Certificate Authority (CA). Users and groups are represented by fields in those certificates, not as objects in the cluster.
 
 ---
 
-## Identidades no Kubernetes
+## Authentication vs Authorization
 
-### Users (Usuários)
-Indivíduos ou aplicações que interagem com o cluster — administradores, desenvolvedores ou sistemas automatizados. São **gerenciados externamente** ao Kubernetes; dentro do cluster, são representados apenas por uma string (ex: `alice` ou `alice@example.com`).
+Kubernetes processes every API request through three stages:
 
-> Em certificados, o usuário é definido pelo campo **CN (Common Name)**.
+```
+Request → Authentication → Authorization (RBAC) → Admission Controllers → etcd
+```
 
-### Groups (Grupos)
-Também gerenciados fora do Kubernetes. Um grupo agrega múltiplos usuários e permite atribuir um conjunto de permissões de uma vez — todos os membros do grupo herdam essas permissões automaticamente.
+| Stage | Question answered | Mechanism |
+|---|---|---|
+| **Authentication** | Who are you? | Certificates, tokens, OIDC, basic auth |
+| **Authorization** | Are you allowed to do this? | RBAC, ABAC, Node, Webhook |
+| **Admission Control** | Should this request be allowed/mutated? | Built-in and custom admission webhooks |
 
-> Em certificados, o grupo é definido pelo campo **O (Organisation)**.
+> **Exam tip:** Authentication proves identity; authorization decides permissions. RBAC is the standard authorization mode in Kubernetes.
+
+---
+
+## Identities in Kubernetes
+
+### Users
+Individuals or applications that interact with the cluster — admins, developers, or automated systems. They are **managed externally** to Kubernetes; inside the cluster they are represented only by a string (e.g., `alice` or `alice@example.com`).
+
+> In certificates, the user is identified by the **CN (Common Name)** field.
+
+### Groups
+Also managed outside Kubernetes. A group aggregates multiple users and lets you assign a set of permissions at once — all members of the group automatically inherit those permissions.
+
+> In certificates, the group is identified by the **O (Organisation)** field.
+
+> **Exam tip:** Kubernetes has built-in groups: `system:masters` grants cluster-admin level access, `system:authenticated` matches any authenticated user, and `system:unauthenticated` matches unauthenticated requests.
 
 ### ServiceAccounts
-Usados por **aplicações rodando dentro do próprio cluster** (não por humanos). Diferente de usuários e grupos, ServiceAccounts são **objetos Kubernetes** gerenciados pelo próprio cluster. Concedem as permissões necessárias para que um Pod interaja com a API do Kubernetes.
+Used by **applications running inside the cluster** (not by humans). Unlike users and groups, ServiceAccounts are **Kubernetes objects** managed by the cluster itself. They grant the necessary permissions for a Pod to interact with the Kubernetes API.
+
+- Every namespace has a `default` ServiceAccount created automatically
+- Pods are assigned the `default` ServiceAccount of their namespace unless specified otherwise
+- The ServiceAccount token is automatically mounted at `/var/run/secrets/kubernetes.io/serviceaccount/token`
+
+> **Exam tip:** To prevent a Pod from having any API access, set `automountServiceAccountToken: false` in the Pod spec or on the ServiceAccount itself.
 
 ---
 
-## Objetos RBAC
+## RBAC Objects
 
-### Role e RoleBinding
-Escopados a um **namespace** específico. Uma `Role` define o que pode ser feito; um `RoleBinding` associa essa Role a um usuário, grupo ou ServiceAccount dentro do namespace.
+### Role
+Defines a set of permissions (rules) scoped to a **specific namespace**. A Role only grants access — RBAC is purely additive; there are no "deny" rules.
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: pod-reader
+rules:
+- apiGroups: [""]        # "" means the core API group
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+```
+
+### RoleBinding
+Associates a Role with one or more subjects (User, Group, or ServiceAccount) **within a namespace**.
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: read-pods
+  namespace: default
+subjects:
+- kind: User
+  name: alice
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+```
 
 ### ClusterRole
-Recurso **não-namespaciado** — se aplica ao cluster inteiro e permite definir permissões sobre recursos em todos os namespaces. Também usado para recursos que não pertencem a nenhum namespace (ex: `nodes`, `persistentvolumes`).
+A **non-namespaced** resource — applies cluster-wide and can define permissions over:
+- Resources in all namespaces (e.g., `pods`, `deployments`)
+- Non-namespaced resources (e.g., `nodes`, `persistentvolumes`, `namespaces`)
+- Non-resource URLs (e.g., `/healthz`, `/metrics`)
 
 ### ClusterRoleBinding
-Associa um `ClusterRole` a um usuário, grupo ou ServiceAccount com escopo **cluster-wide**.
+Associates a ClusterRole with a subject with **cluster-wide** scope.
+
+> **Exam tip:** A **RoleBinding** can reference a **ClusterRole** — this is a common pattern to define permissions once in a ClusterRole and reuse them in specific namespaces via RoleBindings. The binding scope (namespace vs cluster) always wins.
 
 ---
 
-## Resumo rápido
+## Verbs and Resources
 
-| Objeto               | Escopo      | Descrição                                              |
-|----------------------|-------------|--------------------------------------------------------|
-| Role                 | Namespace   | Define permissões dentro de um namespace               |
-| RoleBinding          | Namespace   | Vincula uma Role a uma identidade no namespace         |
-| ClusterRole          | Cluster     | Define permissões em todo o cluster                    |
-| ClusterRoleBinding   | Cluster     | Vincula um ClusterRole a uma identidade cluster-wide   |
+RBAC rules are composed of **resources** and **verbs**:
 
-| Identidade      | Gerenciado por    | Campo no certificado | Caso de uso principal                            |
-|-----------------|-------------------|----------------------|--------------------------------------------------|
-| User            | Externo (certs)   | CN (Common Name)     | Humanos ou sistemas externos acessando o cluster |
-| Group           | Externo (certs)   | O (Organisation)     | Conjunto de usuários com permissões em comum     |
-| ServiceAccount  | Kubernetes        | —                    | Pods que precisam chamar a API do Kubernetes     |
+| Verb | HTTP method | Description |
+|---|---|---|
+| `get` | GET | Retrieve a single resource |
+| `list` | GET | List resources |
+| `watch` | GET (streaming) | Watch for changes |
+| `create` | POST | Create a new resource |
+| `update` | PUT | Replace a resource |
+| `patch` | PATCH | Partially modify a resource |
+| `delete` | DELETE | Delete a resource |
+| `deletecollection` | DELETE | Delete a collection of resources |
+
+Resources can be further scoped to **subresources**:
+
+```yaml
+resources: ["pods", "pods/log", "pods/exec"]
+```
+
+And to specific **resource names**:
+
+```yaml
+resources: ["configmaps"]
+resourceNames: ["my-config"]   # only this specific ConfigMap
+```
 
 ---
 
-## Comandos úteis
+## Quick Reference
+
+| Object | Scope | Description |
+|---|---|---|
+| Role | Namespace | Defines permissions within a namespace |
+| RoleBinding | Namespace | Binds a Role to an identity within a namespace |
+| ClusterRole | Cluster | Defines permissions cluster-wide |
+| ClusterRoleBinding | Cluster | Binds a ClusterRole to an identity cluster-wide |
+
+| Identity | Managed by | Certificate field | Primary use case |
+|---|---|---|---|
+| User | External (certs/OIDC) | CN (Common Name) | Humans or external systems accessing the cluster |
+| Group | External (certs/OIDC) | O (Organisation) | Set of users sharing permissions |
+| ServiceAccount | Kubernetes | — | Pods that need to call the Kubernetes API |
+
+---
+
+## Aggregated ClusterRoles
+
+ClusterRoles can be composed using **aggregation rules** — labels select other ClusterRoles and their rules are merged automatically. This is how `admin`, `edit`, and `view` built-in roles work.
+
+```yaml
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      rbac.example.com/aggregate-to-monitoring: "true"
+```
+
+> **Exam tip:** The built-in ClusterRoles `cluster-admin`, `admin`, `edit`, and `view` are available in every cluster. `cluster-admin` grants unrestricted access to everything.
+
+---
+
+## Checking Permissions
 
 ```bash
-# Listar todos os ClusterRoleBindings com detalhes
+# Check if the current user can perform an action
+kubectl auth can-i create pods
+kubectl auth can-i delete deployments -n production
+
+# Check permissions for another user or ServiceAccount
+kubectl auth can-i list secrets --as=alice
+kubectl auth can-i list secrets --as=system:serviceaccount:default:my-sa
+
+# List all permissions the current user has
+kubectl auth can-i --list
+kubectl auth can-i --list -n kube-system
+```
+
+---
+
+## Useful Commands
+
+```bash
+# List all ClusterRoleBindings with details
 kubectl get clusterrolebindings -o wide
 
-# Criar um ClusterRole com todas as permissões
+# List Roles and RoleBindings in a namespace
+kubectl get roles,rolebindings -n default
+
+# Describe a role to see its rules
+kubectl describe clusterrole cluster-admin
+
+# Create a Role imperatively
+kubectl create role pod-reader --verb=get,list,watch --resource=pods -n default
+
+# Create a RoleBinding imperatively
+kubectl create rolebinding read-pods \
+  --role=pod-reader \
+  --user=alice \
+  -n default
+
+# Create a ClusterRole with full access
 kubectl create clusterrole cluster-superhero --verb='*' --resource='*'
 
-# Criar um ClusterRoleBinding associando o ClusterRole a um grupo
+# Create a ClusterRoleBinding for a group
 kubectl create clusterrolebinding cluster-superhero \
   --clusterrole=cluster-superhero \
   --group=cluster-superheroes
+
+# Bind a ClusterRole to a ServiceAccount
+kubectl create rolebinding dev-access \
+  --clusterrole=edit \
+  --serviceaccount=default:my-sa \
+  -n development
 ```
 
-> **Dica de prova:** `--verb='*'` e `--resource='*'` concedem acesso total — equivalente a um superusuário. Em ambientes reais, sempre aplique o princípio do **menor privilégio**.
+> **Exam tip:** `--verb='*'` and `--resource='*'` grant full access — equivalent to a superuser. In real environments, always apply the principle of **least privilege**. Use `kubectl auth can-i` to verify effective permissions before and after applying RBAC changes.
