@@ -63,6 +63,22 @@ Determines if the container **application has started**. While it is failing, li
 
 Use it for: slow-starting containers that would otherwise be killed by liveness probes before they finish booting.
 
+### Probe Execution Order
+
+```
+Container starts
+      ↓
+Startup Probe (if defined)
+  ├── keeps failing → kubelet restarts the container
+  └── succeeds (or not defined) ↓
+      ├── Liveness Probe  → failure = container restart
+      └── Readiness Probe → failure = removed from Service endpoints
+```
+
+All three probes run **concurrently** once the startup probe succeeds — liveness and readiness are independent of each other after that point.
+
+> **Exam tip:** If no startup probe is defined, liveness and readiness probes start immediately when the container starts. This can cause fast-failing liveness probes to kill a slow-starting container before it ever becomes ready — that is exactly the problem the startup probe solves.
+
 ### Probe mechanisms:
 
 | Mechanism | How it works |

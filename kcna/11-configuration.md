@@ -223,6 +223,140 @@ The **Downward API** allows Pods to access information about themselves (Pod nam
 
 Available as environment variables (`fieldRef`, `resourceFieldRef`) or as volume files.
 
+## Labels and Annotations
+
+Both labels and annotations are **key-value pairs** attached to Kubernetes objects in the `metadata` section. They serve different purposes.
+
+### Labels
+
+Labels are **identifying metadata** used to organize objects and to select groups of them. They are the primary mechanism for Kubernetes internals (Services, Deployments, NetworkPolicies, etc.) to target specific Pods.
+
+```yaml
+metadata:
+  name: my-pod
+  labels:
+    app: my-app
+    version: v2
+    environment: production
+    tier: frontend
+```
+
+**Label key format:** `[prefix/]name`
+- Prefix is optional and must be a valid DNS subdomain (e.g., `app.kubernetes.io/name`)
+- Name is required; max 63 characters
+- Well-known prefix: `app.kubernetes.io/` — used by Kubernetes tooling and Helm
+
+**Common recommended labels (`app.kubernetes.io/`):**
+
+| Label | Example value | Description |
+|---|---|---|
+| `app.kubernetes.io/name` | `mysql` | Name of the application |
+| `app.kubernetes.io/version` | `5.7.21` | Current version |
+| `app.kubernetes.io/component` | `database` | Component within the architecture |
+| `app.kubernetes.io/part-of` | `my-app` | Higher-level app this is part of |
+| `app.kubernetes.io/managed-by` | `helm` | Tool used to manage the app |
+
+#### Label Selectors
+
+Used by controllers and Services to select which Pods they manage:
+
+**Equality-based:**
+```yaml
+selector:
+  matchLabels:
+    app: my-app
+    environment: production
+```
+
+**Set-based:**
+```yaml
+selector:
+  matchExpressions:
+  - key: environment
+    operator: In
+    values: [production, staging]
+  - key: tier
+    operator: NotIn
+    values: [frontend]
+  - key: version
+    operator: Exists
+```
+
+| Operator | Behavior |
+|---|---|
+| `In` | Key's value must be in the list |
+| `NotIn` | Key's value must not be in the list |
+| `Exists` | Key must be present (any value) |
+| `DoesNotExist` | Key must not be present |
+
+> **Exam tip:** Services use the older `selector:` field (equality-based only). Deployments, Jobs, and NetworkPolicies use `matchLabels` / `matchExpressions` (supports set-based). You cannot change a Deployment's `selector` after creation.
+
+### Annotations
+
+Annotations are **non-identifying metadata** — arbitrary key-value pairs used to attach information to objects for tools, libraries, and humans. They are **not** used for selection.
+
+```yaml
+metadata:
+  name: my-pod
+  annotations:
+    description: "Main application pod for the payments service"
+    contact: "team-payments@example.com"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {...}
+```
+
+**Common uses:**
+- Build/release metadata (Git commit SHA, image tag, CI run ID)
+- Configuration for tools and controllers (Ingress annotations, Prometheus scrape config)
+- Documentation (description, owner, runbook URL)
+- `kubectl apply` stores the last-applied config as an annotation
+
+**Key format:** same as labels — `[prefix/]name`. Annotation values can be **any string**, including JSON or YAML blobs (unlike label values which have character restrictions).
+
+### Labels vs Annotations
+
+| Aspect | Labels | Annotations |
+|---|---|---|
+| Purpose | Identifying; used for selection | Non-identifying; used for metadata |
+| Used by selectors | Yes | No |
+| Value restrictions | Max 63 chars, alphanumeric + `-_.` | Any string, no size limit* |
+| Queryable with kubectl | Yes (`-l app=my-app`) | No |
+| Example use | Group Pods for a Service | Store Prometheus scrape config |
+
+*Annotations with very large values can impact API server performance.
+
+### Useful Commands
+
+```bash
+# Filter resources by label
+kubectl get pods -l app=my-app
+kubectl get pods -l environment=production,tier=frontend
+kubectl get pods -l 'environment in (production,staging)'
+
+# Add / update a label on a running object
+kubectl label pod my-pod version=v2
+kubectl label pod my-pod version=v3 --overwrite
+
+# Remove a label (trailing dash)
+kubectl label pod my-pod version-
+
+# Add / update an annotation
+kubectl annotate pod my-pod description="payments service"
+kubectl annotate pod my-pod description="updated" --overwrite
+
+# Remove an annotation
+kubectl annotate pod my-pod description-
+
+# Show labels in output
+kubectl get pods --show-labels
+kubectl get pods -L app,environment   # show specific labels as columns
+```
+
+---
+
 ## Useful Commands
 
 ```bash

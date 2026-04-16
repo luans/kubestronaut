@@ -134,7 +134,58 @@ spec:
           storage: 10Gi
 ```
 
-> **Exam tip:** StatefulSets require a **Headless Service** (`clusterIP: None`) to manage the network identity of each Pod. Without it, stable DNS names won't work.
+### StatefulSet + Headless Service: Stable Network Identity
+
+The `serviceName` field in the StatefulSet spec must reference a **Headless Service** — a Service with `clusterIP: None`. This is what enables stable, predictable DNS names for each Pod.
+
+**Headless Service definition:**
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql          # must match StatefulSet's serviceName
+spec:
+  clusterIP: None      # this makes it headless
+  selector:
+    app: mysql
+  ports:
+  - port: 3306
+```
+
+**How the DNS names are constructed:**
+
+```
+<pod-name>.<service-name>.<namespace>.svc.cluster.local
+```
+
+For a StatefulSet named `mysql` with 3 replicas in the `default` namespace:
+
+| Pod | Stable DNS name |
+|---|---|
+| `mysql-0` | `mysql-0.mysql.default.svc.cluster.local` |
+| `mysql-1` | `mysql-1.mysql.default.svc.cluster.local` |
+| `mysql-2` | `mysql-2.mysql.default.svc.cluster.local` |
+
+These names are **stable across restarts and rescheduling** — if `mysql-1` is killed and recreated on a different node, it gets the same DNS name and the same PVC back.
+
+**Why this matters in practice:**
+
+- A Kafka broker can advertise `kafka-0.kafka.default.svc.cluster.local` as its address — clients always find it at that name regardless of which node it runs on
+- A MySQL replica can be configured to replicate from `mysql-0.mysql.default.svc.cluster.local` (the primary) by name, not by IP
+- Cluster members (etcd, Zookeeper) can reference each other by stable names in their configuration files
+
+**Regular Service vs Headless Service with StatefulSet:**
+
+| | Regular Service (ClusterIP) | Headless Service (clusterIP: None) |
+|---|---|---|
+| DNS resolves to | Single virtual IP (load balanced) | Individual Pod IPs directly |
+| Used for | Stateless load balancing | Stable per-Pod addressing |
+| StatefulSet use | Access the cluster as a whole | Address individual members by name |
+
+A StatefulSet typically has **both**: a headless service for stable member addressing, and a regular service for client access to the cluster as a whole.
+
+> **Exam tip:** StatefulSets require a **Headless Service** (`clusterIP: None`) to manage the network identity of each Pod. Without it, stable DNS names won't work. The `serviceName` field in the StatefulSet spec **must match** the `metadata.name` of the Headless Service — this is what links the two together.
 
 ## Job
 
