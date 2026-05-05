@@ -18,6 +18,51 @@ Client (kubectl / app) → Authentication → Authorization (RBAC) → Admission
 
 > **Exam tip:** The kube-apiserver is the only component that communicates with etcd. All other control plane components query and update cluster state **indirectly**, through the API.
 
+## Admission Controllers
+
+Admission Controllers are plugins that intercept API requests **after** authentication and authorization, but **before** the object is persisted to etcd. They can **validate**, **mutate**, or **reject** requests.
+
+**Updated request flow:**
+
+```
+Client → Authentication → Authorization (RBAC) → Mutating Admission → Validating Admission → etcd
+```
+
+### Two types of Admission Controllers
+
+| Type | What it does |
+|---|---|
+| **Mutating** | Can modify the request object (e.g., inject a sidecar, set default values) |
+| **Validating** | Can only approve or reject the request — cannot modify it |
+
+Mutating controllers always run **before** validating controllers, so validators see the final modified object.
+
+### Key built-in Admission Controllers
+
+| Controller | Purpose |
+|---|---|
+| `NamespaceLifecycle` | Rejects requests to create resources in non-existent or terminating namespaces |
+| `LimitRanger` | Enforces LimitRange defaults and constraints on Pods and containers |
+| `ResourceQuota` | Enforces ResourceQuota limits in a namespace |
+| `ServiceAccount` | Automatically mounts the default ServiceAccount token into Pods |
+| `DefaultStorageClass` | Assigns the default StorageClass to PVCs that don't specify one |
+| `MutatingAdmissionWebhook` | Calls external webhooks to mutate objects |
+| `ValidatingAdmissionWebhook` | Calls external webhooks to validate objects |
+| `PodSecurity` | Enforces Pod Security Standards (replaced the deprecated PodSecurityPolicy) |
+
+### Admission Webhooks
+
+Webhooks allow you to extend admission control with **custom logic** without modifying Kubernetes itself. The API server calls an external HTTP endpoint you control.
+
+- **MutatingAdmissionWebhook** — your webhook receives the object and can return a modified version (e.g., inject an Envoy sidecar, add default labels)
+- **ValidatingAdmissionWebhook** — your webhook inspects the object and returns allow or deny (e.g., enforce naming conventions, block images without a digest)
+
+```
+API request → kube-apiserver → calls webhook endpoint (your service) → allow / deny / mutate
+```
+
+> **Exam tip:** Admission controllers are the mechanism behind many Kubernetes features you use daily — LimitRange defaults, ResourceQuota enforcement, and service mesh sidecar injection all rely on admission controllers. If a validating webhook is unavailable and its `failurePolicy` is `Fail`, requests will be rejected — this is a common cause of cluster issues during upgrades.
+
 ## etcd
 
 etcd is a distributed key-value store used by Kubernetes for reliable configuration data and state storage. It is the cluster's source of truth and provides strong consistency, high availability, and data durability.
