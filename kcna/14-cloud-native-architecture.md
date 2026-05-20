@@ -15,6 +15,49 @@ Cloud native is an approach to building and running applications that fully expl
 
 ---
 
+## Fundamental Characteristics of Cloud Native Applications
+
+Cloud native applications are defined by four fundamental characteristics:
+
+### Resiliency
+The ability to recover from failures and continue functioning. A resilient app expects failure and is designed to handle it gracefully.
+
+- Self-healing: Kubernetes restarts failed Pods, reschedules on healthy nodes
+- Redundancy: multiple replicas so a single failure doesn't cause downtime
+- Patterns: circuit breakers, retries with backoff, bulkheads, timeouts
+- Graceful degradation: partial failure doesn't bring down the whole system
+
+### Agility
+The ability to deploy quickly, frequently, and safely — and to respond to change fast.
+
+- Microservices: each service is independently deployable, so teams don't coordinate big-bang releases
+- CI/CD pipelines: automated build, test, and deploy on every commit
+- Rolling updates and canary deployments: release without downtime
+- Small, loosely coupled services reduce the blast radius of any change
+
+### Operability
+The app is designed to be easy to deploy, run, and manage in production.
+
+- **Health probes**: `livenessProbe` (is it alive?) and `readinessProbe` (is it ready for traffic?) tell Kubernetes when to restart or route to a Pod
+- **Graceful shutdown**: handle `SIGTERM`, finish in-flight requests, then exit — enables zero-downtime rolling updates
+- **Externalised config**: config in ConfigMaps/Secrets, not baked into the image (12-factor Config)
+- **Automation**: Operators and controllers automate operational tasks (backups, scaling, failover)
+
+### Observability
+The ability to understand the internal state of the system from its external outputs — without needing to attach a debugger or SSH into a node.
+
+The **three pillars of observability**:
+
+| Pillar | What it tells you | Kubernetes / CNCF tools |
+|---|---|---|
+| **Logs** | What happened, event by event | Fluentd, Fluent Bit, Loki |
+| **Metrics** | How the system is performing over time | Prometheus, Grafana |
+| **Traces** | How a request traveled across services | Jaeger, Zipkin, OpenTelemetry |
+
+> **Exam tip:** The four characteristics — **Resiliency, Agility, Operability, Observability** — are the KCNA-tested framework for what makes an application truly cloud native. The other concepts in this file (microservices, 12-factor, immutable infrastructure) are *enablers* of these four properties.
+
+---
+
 ## Microservices
 
 Microservices is an architectural style where an application is built as a collection of **small, independent services**, each:
@@ -51,6 +94,50 @@ A methodology for building cloud-native applications. Key factors relevant to Ku
 | **Concurrency** | Scale out via the process model | HPA + replicas |
 | **Disposability** | Fast startup and graceful shutdown | Probes + preStop hooks |
 | **Logs** | Treat logs as event streams | stdout/stderr → log aggregator |
+
+---
+
+## Continuous Integration and Continuous Deployment
+
+### Continuous Integration (CI)
+Developers merge code changes into a shared branch frequently — multiple times a day. Each merge triggers an **automated pipeline** that builds and tests the code immediately.
+
+**Goal:** detect integration problems early, before they compound.
+
+**Typical CI pipeline:**
+```
+Code push → Build → Unit tests → Integration tests → Static analysis → Container image build → Push to registry
+```
+
+### Continuous Delivery vs Continuous Deployment
+
+These terms are often confused — the distinction matters for the exam:
+
+| | Continuous Delivery | Continuous Deployment |
+|---|---|---|
+| **Definition** | Every change is automatically tested and made *ready* to deploy | Every change that passes tests is *automatically deployed* to production |
+| **Human gate** | A human approves the production release | No human gate — fully automated |
+| **Risk** | Lower — humans decide when to ship | Higher — requires strong test coverage and observability |
+| **Common in** | Regulated industries, large enterprises | High-velocity teams, SaaS products |
+
+> **Exam tip:** Continuous Delivery ≠ Continuous Deployment. Delivery means *releasable at any time*. Deployment means *released automatically*. All Continuous Deployment pipelines practice Continuous Delivery, but not vice versa.
+
+### How CI/CD Enables Cloud Native Agility
+
+CI/CD is the primary enabler of the **Agility** characteristic:
+- Microservices can be deployed independently — each service has its own pipeline
+- Short feedback loops: a bug introduced at 9am is caught and fixed by 9:05am
+- Rolling updates and canary releases make frequent deploys safe in Kubernetes
+- GitOps (covered in [15-gitops-cicd.md](15-gitops-cicd.md)) extends CD by making Git the source of truth for the cluster state
+
+### Key Deployment Strategies
+
+| Strategy | How it works | Risk |
+|---|---|---|
+| **Recreate** | Terminate all old Pods, then start new ones | Downtime during switch |
+| **Rolling update** | Replace Pods gradually, old and new run briefly in parallel | Default in Kubernetes |
+| **Blue/Green** | Run two identical environments; switch traffic at once | Zero downtime; doubles resource cost briefly |
+| **Canary** | Route a small % of traffic to new version; increase if stable | Lowest risk; requires traffic splitting |
 
 ---
 
