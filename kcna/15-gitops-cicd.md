@@ -19,11 +19,11 @@ Image pushed to registry → Update manifest → kubectl apply / Helm upgrade �
 ```
 
 ### Common CI/CD Tools
-- **Jenkins** — widely used; highly configurable
-- **GitHub Actions** — integrated with GitHub repositories
-- **GitLab CI** — integrated with GitLab
-- **Tekton** — Kubernetes-native CI/CD; CNCF project
-- **Argo Workflows** — Kubernetes-native workflow engine
+- **Jenkins** - widely used; highly configurable
+- **GitHub Actions** - integrated with GitHub repositories
+- **GitLab CI** - integrated with GitLab
+- **Tekton** - Kubernetes-native CI/CD; CNCF project
+- **Argo Workflows** - Kubernetes-native workflow engine
 
 ---
 
@@ -32,10 +32,10 @@ Image pushed to registry → Update manifest → kubectl apply / Helm upgrade �
 **GitOps** is an operational framework where **Git is the single source of truth** for the desired state of infrastructure and applications.
 
 **Core principles:**
-1. **Declarative** — the entire system is described declaratively (YAML manifests)
-2. **Versioned and immutable** — desired state is stored in Git; changes are tracked
-3. **Pulled automatically** — software agents (operators) automatically apply the desired state
-4. **Continuously reconciled** — agents detect and correct drift between desired and actual state
+1. **Declarative** - the entire system is described declaratively (YAML manifests)
+2. **Versioned and immutable** - desired state is stored in Git; changes are tracked
+3. **Pulled automatically** - software agents (operators) automatically apply the desired state
+4. **Continuously reconciled** - agents detect and correct drift between desired and actual state
 
 **Push-based vs Pull-based:**
 
@@ -44,7 +44,7 @@ Image pushed to registry → Update manifest → kubectl apply / Helm upgrade �
 | **Push** | CI pipeline pushes changes directly to the cluster via `kubectl` or API | Jenkins + kubectl |
 | **Pull** | An agent inside the cluster watches Git and pulls changes | Argo CD, Flux |
 
-> **Exam tip:** GitOps favors the **pull model** — the cluster agent pulls from Git, so the cluster initiates the connection. This is more secure (no external write access to the cluster needed) and provides continuous reconciliation.
+> **Exam tip:** GitOps favors the **pull model** - the cluster agent pulls from Git, so the cluster initiates the connection. This is more secure (no external write access to the cluster needed) and provides continuous reconciliation.
 
 ---
 
@@ -63,10 +63,10 @@ Git repo (desired state) ← watches ← Argo CD → applies → Kubernetes clus
 ```
 
 **Key concepts:**
-- **Application** — Argo CD resource linking a Git repo + path to a Kubernetes cluster + namespace
-- **Sync** — the action of making the cluster match Git
-- **Health status** — Argo CD evaluates if resources are actually healthy, not just applied
-- **App of Apps** — pattern for managing multiple applications declaratively
+- **Application** - Argo CD resource linking a Git repo + path to a Kubernetes cluster + namespace
+- **Sync** - the action of making the cluster match Git
+- **Health status** - Argo CD evaluates if resources are actually healthy, not just applied
+- **App of Apps** - pattern for managing multiple applications declaratively
 
 ---
 
@@ -75,17 +75,17 @@ Git repo (desired state) ← watches ← Argo CD → applies → Kubernetes clus
 **Flux** is another CNCF GitOps tool. It is a **CNCF graduated project** and takes a more modular, controller-based approach than Argo CD.
 
 **Flux controllers:**
-- `source-controller` — watches Git repos, Helm repos, OCI registries
-- `kustomize-controller` — applies Kustomize manifests
-- `helm-controller` — manages Helm releases
-- `notification-controller` — sends alerts and receives webhooks
-- `image-automation-controller` — updates Git with new image tags
+- `source-controller` - watches Git repos, Helm repos, OCI registries
+- `kustomize-controller` - applies Kustomize manifests
+- `helm-controller` - manages Helm releases
+- `notification-controller` - sends alerts and receives webhooks
+- `image-automation-controller` - updates Git with new image tags
 
 ---
 
 ## Helm
 
-**Helm** is the package manager for Kubernetes. It uses **Charts** — packages of pre-configured Kubernetes resources.
+**Helm** is the package manager for Kubernetes. It uses **Charts** - packages of pre-configured Kubernetes resources.
 
 **Key concepts:**
 
@@ -121,13 +121,13 @@ helm list
 helm uninstall my-release
 ```
 
-> **Exam tip:** Helm is not a GitOps tool by itself — it's a packaging/templating tool. GitOps tools like Argo CD and Flux have native Helm support and can manage Helm releases declaratively.
+> **Exam tip:** Helm is not a GitOps tool by itself - it's a packaging/templating tool. GitOps tools like Argo CD and Flux have native Helm support and can manage Helm releases declaratively.
 
 ---
 
 ## Kustomize
 
-**Kustomize** is a Kubernetes-native configuration management tool (built into `kubectl`). It lets you customize raw YAML manifests without templating — using **overlays** on top of a base configuration.
+**Kustomize** is a Kubernetes-native configuration management tool (built into `kubectl`). It lets you customize raw YAML manifests without templating - using **overlays** on top of a base configuration.
 
 **Structure:**
 ```
@@ -148,7 +148,7 @@ kubectl apply -k overlays/production/
 kubectl kustomize overlays/production/   # preview output
 ```
 
-> **Exam tip:** Kustomize is built into `kubectl` (no separate install needed). Argo CD and Flux both natively support Kustomize. Unlike Helm, Kustomize doesn't use a templating language — it patches existing YAML.
+> **Exam tip:** Kustomize is built into `kubectl` (no separate install needed). Argo CD and Flux both natively support Kustomize. Unlike Helm, Kustomize doesn't use a templating language - it patches existing YAML.
 
 ---
 

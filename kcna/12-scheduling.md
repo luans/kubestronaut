@@ -4,12 +4,12 @@
 
 The `kube-scheduler` watches for Pods with no assigned node and selects the best node for each Pod through two phases:
 
-1. **Filtering** — eliminates nodes that do not meet the Pod's requirements
-2. **Scoring** — ranks remaining nodes; the highest-scoring node wins
+1. **Filtering** - eliminates nodes that do not meet the Pod's requirements
+2. **Scoring** - ranks remaining nodes; the highest-scoring node wins
 
 ## nodeSelector
 
-The simplest way to constrain a Pod to specific nodes — requires an exact label match.
+The simplest way to constrain a Pod to specific nodes - requires an exact label match.
 
 ```yaml
 spec:
@@ -27,12 +27,12 @@ kubectl label node node-1 disktype=ssd
 
 ## Node Affinity
 
-More expressive than `nodeSelector` — supports operators (`In`, `NotIn`, `Exists`, `DoesNotExist`, `Gt`, `Lt`) and two enforcement modes.
+More expressive than `nodeSelector` - supports operators (`In`, `NotIn`, `Exists`, `DoesNotExist`, `Gt`, `Lt`) and two enforcement modes.
 
 | Type | Behavior |
 |---|---|
-| `requiredDuringSchedulingIgnoredDuringExecution` | **Hard** requirement — Pod won't schedule if no node matches |
-| `preferredDuringSchedulingIgnoredDuringExecution` | **Soft** preference — scheduler tries to match but will place elsewhere if needed |
+| `requiredDuringSchedulingIgnoredDuringExecution` | **Hard** requirement - Pod won't schedule if no node matches |
+| `preferredDuringSchedulingIgnoredDuringExecution` | **Soft** preference - scheduler tries to match but will place elsewhere if needed |
 
 ```yaml
 spec:
@@ -53,7 +53,7 @@ spec:
             values: ["us-east-1"]
 ```
 
-> **Exam tip:** `IgnoredDuringExecution` means the rule is only evaluated at scheduling time — if a node's labels change after the Pod is scheduled, the Pod is **not** evicted.
+> **Exam tip:** `IgnoredDuringExecution` means the rule is only evaluated at scheduling time - if a node's labels change after the Pod is scheduled, the Pod is **not** evicted.
 
 ## Pod Affinity and Anti-Affinity
 
@@ -113,7 +113,7 @@ spec:
     tolerationSeconds: 300    # tolerate for 300s before eviction
 ```
 
-> **Exam tip:** Control plane nodes have a `node-role.kubernetes.io/control-plane:NoSchedule` taint by default — this is why regular workloads don't land on master nodes. System Pods (CoreDNS, kube-proxy) have matching tolerations.
+> **Exam tip:** Control plane nodes have a `node-role.kubernetes.io/control-plane:NoSchedule` taint by default - this is why regular workloads don't land on master nodes. System Pods (CoreDNS, kube-proxy) have matching tolerations.
 
 ### Toleration Operators
 
@@ -122,7 +122,7 @@ A toleration uses one of two `operator` values to match a taint:
 | Operator | Behavior |
 |---|---|
 | `Equal` | `key`, `value`, and `effect` must all match the taint exactly (default) |
-| `Exists` | Only `key` (and optionally `effect`) must match — `value` is ignored |
+| `Exists` | Only `key` (and optionally `effect`) must match - `value` is ignored |
 
 ```yaml
 spec:
@@ -144,7 +144,7 @@ spec:
 
 > **Exam tip:** An empty `key` with `operator: Exists` tolerates every taint on the node. This is used by system components that must run anywhere (e.g., `kube-proxy`).
 
-### Multiple Taints — How They Interact
+### Multiple Taints - How They Interact
 
 When a node has **multiple taints**, Kubernetes evaluates each one independently. A Pod must tolerate **all** taints or face the strictest untolerated effect.
 
@@ -155,13 +155,13 @@ When a node has **multiple taints**, Kubernetes evaluates each one independently
 
 The rule: *the most severe untolerated effect wins.*
 
-### Taints Repel — Tolerations Don't Attract
+### Taints Repel - Tolerations Don't Attract
 
 A common misunderstanding: tolerations **allow** a Pod to be placed on a tainted node, but they do **not guarantee** it will land there. The scheduler can still place the Pod on any other untainted node.
 
 For a **dedicated node** pattern (e.g., reserving nodes exclusively for GPU workloads), you need **both**:
-1. A taint on the node — to keep non-GPU Pods off
-2. Node affinity on the Pod — to pull GPU Pods toward those nodes
+1. A taint on the node - to keep non-GPU Pods off
+2. Node affinity on the Pod - to pull GPU Pods toward those nodes
 
 ```yaml
 # Node: kubectl taint node gpu-node-1 hardware=gpu:NoSchedule
@@ -185,7 +185,7 @@ spec:
 
 ### Node Condition Auto-Taints
 
-Kubernetes automatically adds taints to nodes when certain conditions are detected. You don't need to add these manually — the node lifecycle controller manages them.
+Kubernetes automatically adds taints to nodes when certain conditions are detected. You don't need to add these manually - the node lifecycle controller manages them.
 
 | Taint (key) | Effect | Triggered by |
 |---|---|---|
@@ -197,9 +197,9 @@ Kubernetes automatically adds taints to nodes when certain conditions are detect
 | `node.kubernetes.io/unschedulable` | `NoSchedule` | Node is cordoned (`kubectl cordon`) |
 | `node.kubernetes.io/network-unavailable` | `NoSchedule` | Node reports no network route |
 
-> **Exam tip:** DaemonSet Pods automatically receive `NoExecute` tolerations for `not-ready` and `unreachable` (with no `tolerationSeconds`). This ensures DaemonSet Pods stay running even on degraded nodes — they are designed to run on every node regardless of health.
+> **Exam tip:** DaemonSet Pods automatically receive `NoExecute` tolerations for `not-ready` and `unreachable` (with no `tolerationSeconds`). This ensures DaemonSet Pods stay running even on degraded nodes - they are designed to run on every node regardless of health.
 
-### `tolerationSeconds` — Delayed Eviction
+### `tolerationSeconds` - Delayed Eviction
 
 When using `NoExecute`, you can delay eviction with `tolerationSeconds`. The Pod is allowed to keep running on the node for that many seconds after the taint appears, then evicted.
 
@@ -216,20 +216,20 @@ Omitting `tolerationSeconds` on a `NoExecute` toleration means the Pod is **neve
 
 ### Real-World Use Cases
 
-**Dedicated GPU nodes** — reserve nodes exclusively for GPU workloads:
+**Dedicated GPU nodes** - reserve nodes exclusively for GPU workloads:
 ```bash
 kubectl taint node gpu-node-1 hardware=gpu:NoSchedule
 kubectl label node gpu-node-1 hardware=gpu
 ```
 GPU Pods get the toleration + node affinity (shown above); all other Pods are blocked.
 
-**Spot / preemptible nodes** — allow only batch/fault-tolerant workloads:
+**Spot / preemptible nodes** - allow only batch/fault-tolerant workloads:
 ```bash
 kubectl taint node spot-node-1 cloud.google.com/gke-spot=true:NoSchedule
 ```
 Batch jobs tolerate this taint; stateful services do not.
 
-**Soft maintenance drain** — temporarily discourage scheduling without a full `kubectl drain`:
+**Soft maintenance drain** - temporarily discourage scheduling without a full `kubectl drain`:
 ```bash
 kubectl taint node node-1 maintenance=true:NoSchedule
 # Later, when done:
@@ -274,7 +274,7 @@ spec:
 
 ## nodeName
 
-The most direct way to assign a Pod to a specific node — bypasses the scheduler entirely.
+The most direct way to assign a Pod to a specific node - bypasses the scheduler entirely.
 
 ```yaml
 spec:

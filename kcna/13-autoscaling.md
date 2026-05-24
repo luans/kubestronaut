@@ -40,7 +40,7 @@ spec:
 metrics-server → HPA controller → adjusts replica count → Deployment
 ```
 
-> **Exam tip:** HPA requires **metrics-server** to be installed. CPU-based HPA only works if containers have **CPU requests** defined — without requests, there is no baseline to calculate utilization percentage.
+> **Exam tip:** HPA requires **metrics-server** to be installed. CPU-based HPA only works if containers have **CPU requests** defined - without requests, there is no baseline to calculate utilization percentage.
 
 ### Imperative creation:
 
@@ -78,15 +78,15 @@ spec:
     updateMode: "Auto"
 ```
 
-> **Exam tip:** VPA and HPA **should not** be used together on the same CPU/memory metrics — they can conflict. VPA is not installed by default; it requires a separate installation.
+> **Exam tip:** VPA and HPA **should not** be used together on the same CPU/memory metrics - they can conflict. VPA is not installed by default; it requires a separate installation.
 
 ---
 
 ## Cluster Autoscaler
 
 The **Cluster Autoscaler** adjusts the **number of nodes** in a cluster:
-- **Scale up** — when Pods are `Pending` due to insufficient node resources
-- **Scale down** — when nodes have been underutilized for a period and their Pods can be rescheduled elsewhere
+- **Scale up** - when Pods are `Pending` due to insufficient node resources
+- **Scale down** - when nodes have been underutilized for a period and their Pods can be rescheduled elsewhere
 
 Cluster Autoscaler is cloud-provider-specific (AWS, GCP, Azure) and integrates with the cloud's node group/autoscaling group APIs.
 

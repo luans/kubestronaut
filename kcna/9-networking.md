@@ -38,15 +38,15 @@ CoreDNS is deployed as a Deployment in the `kube-system` namespace and serves as
 | Headless Service Pod | `<pod-name>.<service>.<namespace>.svc.cluster.local` |
 
 From within a Pod, you can use:
-- `my-service` — same namespace
-- `my-service.other-namespace` — cross-namespace
-- `my-service.other-namespace.svc.cluster.local` — fully qualified
+- `my-service` - same namespace
+- `my-service.other-namespace` - cross-namespace
+- `my-service.other-namespace.svc.cluster.local` - fully qualified
 
 The DNS search path inside Pods is configured via `/etc/resolv.conf` automatically.
 
 ## kube-proxy
 
-**kube-proxy** runs on every node and maintains network rules (iptables or IPVS) that implement the Service abstraction — forwarding traffic from a Service's ClusterIP to one of its backing Pods.
+**kube-proxy** runs on every node and maintains network rules (iptables or IPVS) that implement the Service abstraction - forwarding traffic from a Service's ClusterIP to one of its backing Pods.
 
 **Modes:**
 
@@ -68,7 +68,7 @@ A **NetworkPolicy** is a Kubernetes resource that controls **ingress and egress 
 - No NetworkPolicy selected → **all traffic allowed**
 - At least one NetworkPolicy selects a Pod → **only explicitly allowed traffic is permitted** (default deny for the selected policy types)
 
-### Example — deny all ingress, allow only from frontend:
+### Example - deny all ingress, allow only from frontend:
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -100,7 +100,7 @@ spec:
 | `namespaceSelector` | All Pods in matching namespaces |
 | `ipBlock` | CIDR ranges (for external traffic) |
 
-> **Exam tip:** NetworkPolicy is **additive** — multiple policies selecting the same Pod are unioned together. There are no explicit deny rules; you restrict by limiting what is allowed.
+> **Exam tip:** NetworkPolicy is **additive** - multiple policies selecting the same Pod are unioned together. There are no explicit deny rules; you restrict by limiting what is allowed.
 
 ### Default deny all (ingress and egress):
 

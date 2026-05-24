@@ -27,12 +27,12 @@ Request → Authentication → Authorization (RBAC) → Admission Controllers �
 ## Identities in Kubernetes
 
 ### Users
-Individuals or applications that interact with the cluster — admins, developers, or automated systems. They are **managed externally** to Kubernetes; inside the cluster they are represented only by a string (e.g., `alice` or `alice@example.com`).
+Individuals or applications that interact with the cluster - admins, developers, or automated systems. They are **managed externally** to Kubernetes; inside the cluster they are represented only by a string (e.g., `alice` or `alice@example.com`).
 
 > In certificates, the user is identified by the **CN (Common Name)** field.
 
 ### Groups
-Also managed outside Kubernetes. A group aggregates multiple users and lets you assign a set of permissions at once — all members of the group automatically inherit those permissions.
+Also managed outside Kubernetes. A group aggregates multiple users and lets you assign a set of permissions at once - all members of the group automatically inherit those permissions.
 
 > In certificates, the group is identified by the **O (Organisation)** field.
 
@@ -52,7 +52,7 @@ Used by **applications running inside the cluster** (not by humans). Unlike user
 ## RBAC Objects
 
 ### Role
-Defines a set of permissions (rules) scoped to a **specific namespace**. A Role only grants access — RBAC is purely additive; there are no "deny" rules.
+Defines a set of permissions (rules) scoped to a **specific namespace**. A Role only grants access - RBAC is purely additive; there are no "deny" rules.
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -86,7 +86,7 @@ roleRef:
 ```
 
 ### ClusterRole
-A **non-namespaced** resource — applies cluster-wide and can define permissions over:
+A **non-namespaced** resource - applies cluster-wide and can define permissions over:
 - Resources in all namespaces (e.g., `pods`, `deployments`)
 - Non-namespaced resources (e.g., `nodes`, `persistentvolumes`, `namespaces`)
 - Non-resource URLs (e.g., `/healthz`, `/metrics`)
@@ -94,7 +94,7 @@ A **non-namespaced** resource — applies cluster-wide and can define permission
 ### ClusterRoleBinding
 Associates a ClusterRole with a subject with **cluster-wide** scope.
 
-> **Exam tip:** A **RoleBinding** can reference a **ClusterRole** — this is a common pattern to define permissions once in a ClusterRole and reuse them in specific namespaces via RoleBindings. The binding scope (namespace vs cluster) always wins.
+> **Exam tip:** A **RoleBinding** can reference a **ClusterRole** - this is a common pattern to define permissions once in a ClusterRole and reuse them in specific namespaces via RoleBindings. The binding scope (namespace vs cluster) always wins.
 
 ---
 
@@ -141,13 +141,13 @@ resourceNames: ["my-config"]   # only this specific ConfigMap
 |---|---|---|---|
 | User | External (certs/OIDC) | CN (Common Name) | Humans or external systems accessing the cluster |
 | Group | External (certs/OIDC) | O (Organisation) | Set of users sharing permissions |
-| ServiceAccount | Kubernetes | — | Pods that need to call the Kubernetes API |
+| ServiceAccount | Kubernetes | - | Pods that need to call the Kubernetes API |
 
 ---
 
 ## Aggregated ClusterRoles
 
-ClusterRoles can be composed using **aggregation rules** — labels select other ClusterRoles and their rules are merged automatically. This is how `admin`, `edit`, and `view` built-in roles work.
+ClusterRoles can be composed using **aggregation rules** - labels select other ClusterRoles and their rules are merged automatically. This is how `admin`, `edit`, and `view` built-in roles work.
 
 ```yaml
 aggregationRule:
@@ -214,4 +214,4 @@ kubectl create rolebinding dev-access \
   -n development
 ```
 
-> **Exam tip:** `--verb='*'` and `--resource='*'` grant full access — equivalent to a superuser. In real environments, always apply the principle of **least privilege**. Use `kubectl auth can-i` to verify effective permissions before and after applying RBAC changes.
+> **Exam tip:** `--verb='*'` and `--resource='*'` grant full access - equivalent to a superuser. In real environments, always apply the principle of **least privilege**. Use `kubectl auth can-i` to verify effective permissions before and after applying RBAC changes.

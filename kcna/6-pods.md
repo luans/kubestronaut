@@ -4,7 +4,7 @@
 
 A Pod is the **smallest deployable unit** in Kubernetes. It represents one or more containers that share the same network namespace, IPC namespace, and optionally storage volumes. Containers inside a Pod communicate with each other via `localhost`.
 
-> **Exam tip:** You almost never create Pods directly in production. You use higher-level workload resources (Deployments, StatefulSets, etc.) that manage Pods for you. A standalone Pod is called a **static Pod** or a **naked Pod** — if it dies, nothing recreates it.
+> **Exam tip:** You almost never create Pods directly in production. You use higher-level workload resources (Deployments, StatefulSets, etc.) that manage Pods for you. A standalone Pod is called a **static Pod** or a **naked Pod** - if it dies, nothing recreates it.
 
 ## Pod Lifecycle
 
@@ -27,7 +27,7 @@ Each container within a Pod also has its own state:
 
 | State | Description |
 |---|---|
-| `Waiting` | Not yet running — pulling image, applying secrets, etc. |
+| `Waiting` | Not yet running - pulling image, applying secrets, etc. |
 | `Running` | Process is executing |
 | `Terminated` | Process finished or was killed; has an exit code |
 
@@ -37,13 +37,13 @@ Controls what happens when a container exits:
 
 | Policy | Behavior |
 |---|---|
-| `Always` | Always restart (default) — used for long-running apps |
-| `OnFailure` | Restart only if exit code is non-zero — used for Jobs |
+| `Always` | Always restart (default) - used for long-running apps |
+| `OnFailure` | Restart only if exit code is non-zero - used for Jobs |
 | `Never` | Never restart |
 
 > **Exam tip:** `restartPolicy` applies to all containers in the Pod, not individual containers.
 
-## Pod Spec — Key Fields
+## Pod Spec - Key Fields
 
 ```yaml
 apiVersion: v1
@@ -83,16 +83,16 @@ Init containers run **before** the main application containers start. They must 
 - Register the Pod with an external system
 
 **Properties:**
-- Run sequentially — each must succeed before the next starts
+- Run sequentially - each must succeed before the next starts
 - Share volumes with app containers but have a separate image and environment
 - Do not support liveness/readiness probes (they must exit 0 to be considered done)
 
 ## Sidecar Containers
 
 Sidecars are additional containers in the same Pod that augment the main application without modifying it. Common patterns:
-- **Log shipping** — sidecar reads log files from a shared volume and sends to a logging backend
-- **Proxy/service mesh** — Envoy sidecar handles all network traffic (used by Istio)
-- **Secret injection** — sidecar fetches secrets from a vault and writes them to a shared volume
+- **Log shipping** - sidecar reads log files from a shared volume and sends to a logging backend
+- **Proxy/service mesh** - Envoy sidecar handles all network traffic (used by Istio)
+- **Secret injection** - sidecar fetches secrets from a vault and writes them to a shared volume
 
 ## Multi-container Pod Patterns
 

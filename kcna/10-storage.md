@@ -2,7 +2,7 @@
 
 ## Volumes
 
-A **Volume** in Kubernetes is a directory accessible to containers in a Pod. Unlike a container's filesystem, volumes have a lifetime tied to the **Pod** (not the container) — data survives container restarts within the same Pod.
+A **Volume** in Kubernetes is a directory accessible to containers in a Pod. Unlike a container's filesystem, volumes have a lifetime tied to the **Pod** (not the container) - data survives container restarts within the same Pod.
 
 ### Common Volume Types
 
@@ -34,7 +34,7 @@ spec:
 
 ## Persistent Volumes (PV)
 
-A **PersistentVolume** is a piece of storage in the cluster provisioned by an admin or dynamically by a StorageClass. It exists **independently of any Pod** — data persists even after the Pod that used it is deleted.
+A **PersistentVolume** is a piece of storage in the cluster provisioned by an admin or dynamically by a StorageClass. It exists **independently of any Pod** - data persists even after the Pod that used it is deleted.
 
 ```yaml
 apiVersion: v1
@@ -118,7 +118,7 @@ spec:
 
 ## StorageClass
 
-A **StorageClass** enables **dynamic provisioning** — when a PVC is created, Kubernetes automatically provisions a new PV using the StorageClass's provisioner.
+A **StorageClass** enables **dynamic provisioning** - when a PVC is created, Kubernetes automatically provisions a new PV using the StorageClass's provisioner.
 
 ```yaml
 apiVersion: storage.k8s.io/v1
@@ -133,8 +133,8 @@ volumeBindingMode: WaitForFirstConsumer
 ```
 
 **`volumeBindingMode`:**
-- `Immediate` — PV is provisioned as soon as PVC is created
-- `WaitForFirstConsumer` — delays provisioning until a Pod using the PVC is scheduled (respects topology constraints)
+- `Immediate` - PV is provisioned as soon as PVC is created
+- `WaitForFirstConsumer` - delays provisioning until a Pod using the PVC is scheduled (respects topology constraints)
 
 > **Exam tip:** If a PVC does not specify a `storageClassName`, it uses the **default** StorageClass (marked with the annotation `storageclass.kubernetes.io/is-default-class: "true"`). If no default exists and no class is specified, the PVC stays `Pending`.
 

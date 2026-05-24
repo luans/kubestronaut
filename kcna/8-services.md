@@ -2,7 +2,7 @@
 
 ## Why Services?
 
-Pods are ephemeral — they get new IP addresses every time they restart or are rescheduled. A **Service** provides a stable network endpoint (IP + DNS name) that load-balances traffic to a dynamic set of Pods selected by labels.
+Pods are ephemeral - they get new IP addresses every time they restart or are rescheduled. A **Service** provides a stable network endpoint (IP + DNS name) that load-balances traffic to a dynamic set of Pods selected by labels.
 
 ## How Services Work
 
@@ -51,7 +51,7 @@ spec:
 ### LoadBalancer
 Provisions an **external load balancer** from the cloud provider (AWS ELB, GCP LB, Azure LB). The external IP is assigned by the cloud.
 
-- Superset of NodePort — also creates a NodePort and ClusterIP
+- Superset of NodePort - also creates a NodePort and ClusterIP
 - Only works on cloud clusters or with a bare-metal LB solution (MetalLB)
 
 ```yaml
@@ -63,7 +63,7 @@ spec:
 ```
 
 ### ExternalName
-Maps the Service to an **external DNS name** — no proxying, just a CNAME record.
+Maps the Service to an **external DNS name** - no proxying, just a CNAME record.
 
 ```yaml
 spec:
@@ -71,11 +71,11 @@ spec:
   externalName: database.external.com
 ```
 
-> **Exam tip:** Service type hierarchy: `ClusterIP ⊂ NodePort ⊂ LoadBalancer`. Each builds on the previous. `ExternalName` is the odd one out — it does not select Pods.
+> **Exam tip:** Service type hierarchy: `ClusterIP ⊂ NodePort ⊂ LoadBalancer`. Each builds on the previous. `ExternalName` is the odd one out - it does not select Pods.
 
 ## Headless Services
 
-A Service with `clusterIP: None`. No load balancing — DNS returns the IPs of all matching Pods directly. Required by StatefulSets to give each Pod a stable DNS name.
+A Service with `clusterIP: None`. No load balancing - DNS returns the IPs of all matching Pods directly. Required by StatefulSets to give each Pod a stable DNS name.
 
 ```yaml
 spec:
@@ -112,9 +112,9 @@ From within the same namespace, you can use just the service name. From another 
 ## Ingress
 
 An **Ingress** is an API object that manages **external HTTP/HTTPS access** to Services inside the cluster. It provides:
-- **Host-based routing** — route `app.example.com` to one Service, `api.example.com` to another
-- **Path-based routing** — route `/api` to one Service, `/web` to another
-- **TLS termination** — handle HTTPS at the ingress layer
+- **Host-based routing** - route `app.example.com` to one Service, `api.example.com` to another
+- **Path-based routing** - route `/api` to one Service, `/web` to another
+- **TLS termination** - handle HTTPS at the ingress layer
 
 > **Exam tip:** Ingress is not a Service type. An Ingress requires an **Ingress Controller** to be running in the cluster (Nginx, Traefik, HAProxy, AWS ALB, etc.). The Ingress object alone does nothing without a controller.
 

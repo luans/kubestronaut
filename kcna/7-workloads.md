@@ -1,6 +1,6 @@
 # Workloads
 
-Workload resources manage Pods for you — they handle replication, rolling updates, scheduling guarantees, and restarts. You describe the desired state and the controller reconciles reality to match it.
+Workload resources manage Pods for you - they handle replication, rolling updates, scheduling guarantees, and restarts. You describe the desired state and the controller reconciles reality to match it.
 
 ## ReplicaSet
 
@@ -11,9 +11,9 @@ Ensures a specified number of Pod replicas are running at any given time. If a P
 ## Deployment
 
 The standard way to run **stateless** applications. A Deployment manages a ReplicaSet and adds:
-- **Rolling updates** — gradually replace old Pods with new ones
-- **Rollback** — revert to a previous revision
-- **Scaling** — change the number of replicas declaratively
+- **Rolling updates** - gradually replace old Pods with new ones
+- **Rollback** - revert to a previous revision
+- **Scaling** - change the number of replicas declaratively
 
 ```yaml
 apiVersion: apps/v1
@@ -96,9 +96,9 @@ spec:
 Manages **stateful** applications where each instance needs a stable identity and/or persistent storage.
 
 **Guarantees provided:**
-- **Stable network identity** — each Pod gets a predictable DNS name: `pod-0.service.namespace.svc.cluster.local`
-- **Ordered deployment** — Pods are created sequentially (0, 1, 2, ...) and deleted in reverse order
-- **Persistent storage** — each Pod gets its own PVC via `volumeClaimTemplates` that survives Pod rescheduling
+- **Stable network identity** - each Pod gets a predictable DNS name: `pod-0.service.namespace.svc.cluster.local`
+- **Ordered deployment** - Pods are created sequentially (0, 1, 2, ...) and deleted in reverse order
+- **Persistent storage** - each Pod gets its own PVC via `volumeClaimTemplates` that survives Pod rescheduling
 
 **Use cases:** databases (MySQL, PostgreSQL, Cassandra), distributed systems (Zookeeper, Kafka, etcd)
 
@@ -136,7 +136,7 @@ spec:
 
 ### StatefulSet + Headless Service: Stable Network Identity
 
-The `serviceName` field in the StatefulSet spec must reference a **Headless Service** — a Service with `clusterIP: None`. This is what enables stable, predictable DNS names for each Pod.
+The `serviceName` field in the StatefulSet spec must reference a **Headless Service** - a Service with `clusterIP: None`. This is what enables stable, predictable DNS names for each Pod.
 
 **Headless Service definition:**
 
@@ -167,11 +167,11 @@ For a StatefulSet named `mysql` with 3 replicas in the `default` namespace:
 | `mysql-1` | `mysql-1.mysql.default.svc.cluster.local` |
 | `mysql-2` | `mysql-2.mysql.default.svc.cluster.local` |
 
-These names are **stable across restarts and rescheduling** — if `mysql-1` is killed and recreated on a different node, it gets the same DNS name and the same PVC back.
+These names are **stable across restarts and rescheduling** - if `mysql-1` is killed and recreated on a different node, it gets the same DNS name and the same PVC back.
 
 **Why this matters in practice:**
 
-- A Kafka broker can advertise `kafka-0.kafka.default.svc.cluster.local` as its address — clients always find it at that name regardless of which node it runs on
+- A Kafka broker can advertise `kafka-0.kafka.default.svc.cluster.local` as its address - clients always find it at that name regardless of which node it runs on
 - A MySQL replica can be configured to replicate from `mysql-0.mysql.default.svc.cluster.local` (the primary) by name, not by IP
 - Cluster members (etcd, Zookeeper) can reference each other by stable names in their configuration files
 
@@ -185,7 +185,7 @@ These names are **stable across restarts and rescheduling** — if `mysql-1` is 
 
 A StatefulSet typically has **both**: a headless service for stable member addressing, and a regular service for client access to the cluster as a whole.
 
-> **Exam tip:** StatefulSets require a **Headless Service** (`clusterIP: None`) to manage the network identity of each Pod. Without it, stable DNS names won't work. The `serviceName` field in the StatefulSet spec **must match** the `metadata.name` of the Headless Service — this is what links the two together.
+> **Exam tip:** StatefulSets require a **Headless Service** (`clusterIP: None`) to manage the network identity of each Pod. Without it, stable DNS names won't work. The `serviceName` field in the StatefulSet spec **must match** the `metadata.name` of the Headless Service - this is what links the two together.
 
 ## Job
 
@@ -209,7 +209,7 @@ spec:
         command: ["./migrate.sh"]
 ```
 
-> **Exam tip:** Jobs must use `restartPolicy: OnFailure` or `restartPolicy: Never` — never `Always`. Use `parallelism > 1` to run multiple Pods in parallel (work queues).
+> **Exam tip:** Jobs must use `restartPolicy: OnFailure` or `restartPolicy: Never` - never `Always`. Use `parallelism > 1` to run multiple Pods in parallel (work queues).
 
 ## CronJob
 

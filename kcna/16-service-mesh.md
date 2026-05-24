@@ -12,7 +12,7 @@ A **service mesh** is a dedicated infrastructure layer that handles **service-to
 
 ## Sidecar Proxy Pattern
 
-Most service meshes use a **sidecar proxy** injected into each Pod alongside the application container. All network traffic to/from the application is intercepted and managed by the proxy — transparently, without code changes.
+Most service meshes use a **sidecar proxy** injected into each Pod alongside the application container. All network traffic to/from the application is intercepted and managed by the proxy - transparently, without code changes.
 
 ```
 Pod
@@ -33,7 +33,7 @@ Data Plane (Envoy sidecars in each Pod)
 
 | Feature | Description |
 |---|---|
-| **mTLS** | Mutual TLS — automatically encrypts and authenticates all service-to-service traffic |
+| **mTLS** | Mutual TLS - automatically encrypts and authenticates all service-to-service traffic |
 | **Traffic management** | Load balancing, retries, timeouts, circuit breaking, fault injection |
 | **Observability** | Automatic metrics (golden signals), distributed traces, and access logs for all traffic |
 | **Traffic splitting** | Route a percentage of traffic to different versions (canary releases, A/B testing) |
@@ -67,10 +67,10 @@ Data Plane (Envoy sidecars in each Pod)
 **SMI** is a specification that defines a common API for service meshes on Kubernetes. It allows tooling to work with multiple service mesh implementations without being tightly coupled to any one.
 
 SMI APIs include:
-- `TrafficSplit` — traffic splitting between services
-- `TrafficTarget` — access control policies
-- `HTTPRouteGroup` — HTTP traffic routing rules
-- `TrafficMetrics` — standard metrics interface
+- `TrafficSplit` - traffic splitting between services
+- `TrafficTarget` - access control policies
+- `HTTPRouteGroup` - HTTP traffic routing rules
+- `TrafficMetrics` - standard metrics interface
 
 ## When to Use a Service Mesh
 

@@ -2,16 +2,16 @@
 
 ## What is Cloud Native?
 
-Cloud native is an approach to building and running applications that fully exploits the advantages of cloud computing — scalability, resilience, and flexibility. The **Cloud Native Computing Foundation (CNCF)** defines cloud native as:
+Cloud native is an approach to building and running applications that fully exploits the advantages of cloud computing - scalability, resilience, and flexibility. The **Cloud Native Computing Foundation (CNCF)** defines cloud native as:
 
 > Technologies that empower organizations to build and run scalable applications in modern, dynamic environments such as public, private, and hybrid clouds. Containers, service meshes, microservices, immutable infrastructure, and declarative APIs exemplify this approach.
 
 **Core principles:**
-- **Containerization** — applications packaged as containers
-- **Dynamic orchestration** — containers managed by a scheduler (Kubernetes)
-- **Microservices** — small, independently deployable services
-- **Declarative APIs** — desired state declared, system reconciles to match it
-- **Immutable infrastructure** — replace rather than patch
+- **Containerization** - applications packaged as containers
+- **Dynamic orchestration** - containers managed by a scheduler (Kubernetes)
+- **Microservices** - small, independently deployable services
+- **Declarative APIs** - desired state declared, system reconciles to match it
+- **Immutable infrastructure** - replace rather than patch
 
 ---
 
@@ -28,7 +28,7 @@ The ability to recover from failures and continue functioning. A resilient app e
 - Graceful degradation: partial failure doesn't bring down the whole system
 
 ### Agility
-The ability to deploy quickly, frequently, and safely — and to respond to change fast.
+The ability to deploy quickly, frequently, and safely - and to respond to change fast.
 
 - Microservices: each service is independently deployable, so teams don't coordinate big-bang releases
 - CI/CD pipelines: automated build, test, and deploy on every commit
@@ -39,12 +39,12 @@ The ability to deploy quickly, frequently, and safely — and to respond to chan
 The app is designed to be easy to deploy, run, and manage in production.
 
 - **Health probes**: `livenessProbe` (is it alive?) and `readinessProbe` (is it ready for traffic?) tell Kubernetes when to restart or route to a Pod
-- **Graceful shutdown**: handle `SIGTERM`, finish in-flight requests, then exit — enables zero-downtime rolling updates
+- **Graceful shutdown**: handle `SIGTERM`, finish in-flight requests, then exit - enables zero-downtime rolling updates
 - **Externalised config**: config in ConfigMaps/Secrets, not baked into the image (12-factor Config)
 - **Automation**: Operators and controllers automate operational tasks (backups, scaling, failover)
 
 ### Observability
-The ability to understand the internal state of the system from its external outputs — without needing to attach a debugger or SSH into a node.
+The ability to understand the internal state of the system from its external outputs - without needing to attach a debugger or SSH into a node.
 
 The **three pillars of observability**:
 
@@ -54,7 +54,7 @@ The **three pillars of observability**:
 | **Metrics** | How the system is performing over time | Prometheus, Grafana |
 | **Traces** | How a request traveled across services | Jaeger, Zipkin, OpenTelemetry |
 
-> **Exam tip:** The four characteristics — **Resiliency, Agility, Operability, Observability** — are the KCNA-tested framework for what makes an application truly cloud native. The other concepts in this file (microservices, 12-factor, immutable infrastructure) are *enablers* of these four properties.
+> **Exam tip:** The four characteristics - **Resiliency, Agility, Operability, Observability** - are the KCNA-tested framework for what makes an application truly cloud native. The other concepts in this file (microservices, 12-factor, immutable infrastructure) are *enablers* of these four properties.
 
 ---
 
@@ -100,7 +100,7 @@ A methodology for building cloud-native applications. Key factors relevant to Ku
 ## Continuous Integration and Continuous Deployment
 
 ### Continuous Integration (CI)
-Developers merge code changes into a shared branch frequently — multiple times a day. Each merge triggers an **automated pipeline** that builds and tests the code immediately.
+Developers merge code changes into a shared branch frequently - multiple times a day. Each merge triggers an **automated pipeline** that builds and tests the code immediately.
 
 **Goal:** detect integration problems early, before they compound.
 
@@ -111,13 +111,13 @@ Code push → Build → Unit tests → Integration tests → Static analysis →
 
 ### Continuous Delivery vs Continuous Deployment
 
-These terms are often confused — the distinction matters for the exam:
+These terms are often confused - the distinction matters for the exam:
 
 | | Continuous Delivery | Continuous Deployment |
 |---|---|---|
 | **Definition** | Every change is automatically tested and made *ready* to deploy | Every change that passes tests is *automatically deployed* to production |
-| **Human gate** | A human approves the production release | No human gate — fully automated |
-| **Risk** | Lower — humans decide when to ship | Higher — requires strong test coverage and observability |
+| **Human gate** | A human approves the production release | No human gate - fully automated |
+| **Risk** | Lower - humans decide when to ship | Higher - requires strong test coverage and observability |
 | **Common in** | Regulated industries, large enterprises | High-velocity teams, SaaS products |
 
 > **Exam tip:** Continuous Delivery ≠ Continuous Deployment. Delivery means *releasable at any time*. Deployment means *released automatically*. All Continuous Deployment pipelines practice Continuous Delivery, but not vice versa.
@@ -125,7 +125,7 @@ These terms are often confused — the distinction matters for the exam:
 ### How CI/CD Enables Cloud Native Agility
 
 CI/CD is the primary enabler of the **Agility** characteristic:
-- Microservices can be deployed independently — each service has its own pipeline
+- Microservices can be deployed independently - each service has its own pipeline
 - Short feedback loops: a bug introduced at 9am is caught and fixed by 9:05am
 - Rolling updates and canary releases make frequent deploys safe in Kubernetes
 - GitOps (covered in [15-gitops-cicd.md](15-gitops-cicd.md)) extends CD by making Git the source of truth for the cluster state
@@ -150,11 +150,11 @@ Serverless is a cloud execution model where:
 - Scale to zero is supported
 
 **In Kubernetes**, serverless is implemented by frameworks like:
-- **Knative** — CNCF project; runs event-driven workloads; scales to zero; builds on Kubernetes primitives
-- **OpenFaaS** — Functions as a Service on Kubernetes
-- **KEDA** — event-driven autoscaling that scales to zero
+- **Knative** - CNCF project; runs event-driven workloads; scales to zero; builds on Kubernetes primitives
+- **OpenFaaS** - Functions as a Service on Kubernetes
+- **KEDA** - event-driven autoscaling that scales to zero
 
-> **Exam tip:** Serverless does **not** mean "no servers" — it means the developer doesn't manage servers. Kubernetes-based serverless still runs on nodes.
+> **Exam tip:** Serverless does **not** mean "no servers" - it means the developer doesn't manage servers. Kubernetes-based serverless still runs on nodes.
 
 ---
 
@@ -209,7 +209,7 @@ In Kubernetes: update a Deployment's image tag → rolling update creates new Po
 | **Imperative** | You specify **how** to get there step by step | `kubectl run`, `kubectl create`, `kubectl scale` |
 | **Declarative** | You specify **what** the desired end state is | `kubectl apply -f deployment.yaml` |
 
-Kubernetes is fundamentally **declarative** — you describe desired state in YAML, and controllers reconcile current state to match. This enables GitOps and self-healing.
+Kubernetes is fundamentally **declarative** - you describe desired state in YAML, and controllers reconcile current state to match. This enables GitOps and self-healing.
 
 ---
 
@@ -226,4 +226,4 @@ Cloud native relies on open standards to ensure interoperability:
 | **SMI** (Service Mesh Interface) | Common API for service meshes |
 | **OpenTelemetry** | Metrics, logs, and traces telemetry |
 
-> **Exam tip:** These interfaces decouple Kubernetes from specific implementations — you can swap CNI plugins, storage backends, or container runtimes without changing the core system.
+> **Exam tip:** These interfaces decouple Kubernetes from specific implementations - you can swap CNI plugins, storage backends, or container runtimes without changing the core system.

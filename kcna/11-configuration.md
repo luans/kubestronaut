@@ -51,7 +51,7 @@ spec:
       mountPath: /etc/config    # each key becomes a file
 ```
 
-> **Exam tip:** When mounted as a volume, ConfigMap updates are eventually reflected in the mounted files (after a short delay). Environment variable injections are **not** updated — the Pod must be restarted.
+> **Exam tip:** When mounted as a volume, ConfigMap updates are eventually reflected in the mounted files (after a short delay). Environment variable injections are **not** updated - the Pod must be restarted.
 
 ---
 
@@ -244,7 +244,7 @@ metadata:
 **Label key format:** `[prefix/]name`
 - Prefix is optional and must be a valid DNS subdomain (e.g., `app.kubernetes.io/name`)
 - Name is required; max 63 characters
-- Well-known prefix: `app.kubernetes.io/` — used by Kubernetes tooling and Helm
+- Well-known prefix: `app.kubernetes.io/` - used by Kubernetes tooling and Helm
 
 **Common recommended labels (`app.kubernetes.io/`):**
 
@@ -293,7 +293,7 @@ selector:
 
 ### Annotations
 
-Annotations are **non-identifying metadata** — arbitrary key-value pairs used to attach information to objects for tools, libraries, and humans. They are **not** used for selection.
+Annotations are **non-identifying metadata** - arbitrary key-value pairs used to attach information to objects for tools, libraries, and humans. They are **not** used for selection.
 
 ```yaml
 metadata:
@@ -314,7 +314,7 @@ metadata:
 - Documentation (description, owner, runbook URL)
 - `kubectl apply` stores the last-applied config as an annotation
 
-**Key format:** same as labels — `[prefix/]name`. Annotation values can be **any string**, including JSON or YAML blobs (unlike label values which have character restrictions).
+**Key format:** same as labels - `[prefix/]name`. Annotation values can be **any string**, including JSON or YAML blobs (unlike label values which have character restrictions).
 
 ### Labels vs Annotations
 
