@@ -104,6 +104,63 @@ Client Request
 --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key
 ```
 
+### Network-level access restriction
+
+Hardening flags alone are not enough if the API server is reachable from the internet. The network layer must enforce who can even attempt a connection.
+
+**On managed clusters (EKS, GKE, AKS): private endpoint**
+
+The strongest control is disabling the public endpoint entirely so port 6443 is only reachable inside the VPC:
+
+```hcl
+# Terraform — EKS: no public endpoint, private only
+vpc_config {
+  endpoint_private_access = true
+  endpoint_public_access  = false
+  # Access requires being inside the VPC (VPN, SSM, bastion)
+}
+```
+
+If a public endpoint must stay on during a transition, restrict it to known CIDRs:
+
+```hcl
+# Only the corporate VPN and CI/CD runner egress IPs can reach the API
+public_access_cidrs = ["203.0.113.10/32", "198.51.100.0/24"]
+```
+
+**On self-managed clusters (kubeadm): bind address and firewall**
+
+```bash
+# Bind the apiserver only to the internal network interface
+--bind-address=10.0.1.5        # internal node IP, not 0.0.0.0
+
+# Firewall rule (iptables / cloud security group):
+# Allow 6443 only from: control-plane nodes, worker nodes, VPN CIDR
+# Deny 6443 from: 0.0.0.0/0 (internet)
+```
+
+**kubelet API (port 10250) — also must be restricted:**
+
+```bash
+# kubelet flags
+--address=10.0.1.5             # bind to internal IP only
+--anonymous-auth=false         # require authentication
+--authorization-mode=Webhook   # delegate authorization to apiserver
+
+# Security group / firewall: allow 10250 only from control-plane subnet
+# Workers should never expose kubelet to the internet
+```
+
+**etcd (ports 2379–2380) — must be completely internal:**
+
+```bash
+# etcd listens only on the internal interface
+--listen-client-urls=https://10.0.1.5:2379
+--listen-peer-urls=https://10.0.1.5:2380
+# Never bind to 0.0.0.0 — etcd has no defense against direct read access
+# besides TLS client certificates
+```
+
 ### Audit Logging Policy
 
 ```yaml
@@ -469,6 +526,247 @@ kubectl get secrets --all-namespaces | grep service-account-token
 
 ---
 
+## Node OS: Choosing a Secure Operating System for Kubernetes
+
+The operating system running on Kubernetes nodes is a critical security layer. A general-purpose OS brings thousands of packages, services, and attack vectors that are irrelevant for running containers. Container-optimized OSes reduce this surface drastically.
+
+### Why OS choice matters
+
+```
+General-purpose OS (Ubuntu/Debian/RHEL):
+  - Full package manager (apt/yum)
+  - Hundreds of pre-installed services
+  - SSH, cron, syslog daemons
+  - Shell environment with tools (curl, wget, gcc...)
+  - Large attack surface on every node
+
+Container-optimized OS (Bottlerocket, Flatcar, Talos):
+  - No package manager
+  - Minimal or no interactive shell
+  - Only what is needed to run containers
+  - Immutable root filesystem
+  - Significantly reduced attack surface
+```
+
+### Comparison of node OS options
+
+| OS | Package manager | Shell on node | Root FS | Update model | Best for |
+|---|---|---|---|---|---|
+| Ubuntu/Debian | apt | Yes | Mutable | Traditional | General purpose, flexibility |
+| Amazon Linux 2/2023 | yum/dnf | Yes | Mutable | Traditional | AWS workloads |
+| **Bottlerocket** | **None** | **Admin container only** | **Read-only** | **Atomic (A/B)** | **AWS EKS, security-focused** |
+| Flatcar Container Linux | None | Limited (via toolbox) | Read-only | Atomic (A/B) | Any cloud, CoreOS successor |
+| Talos Linux | None | None (API-only) | Immutable | Atomic | Maximum security, air-gapped |
+
+---
+
+## Bottlerocket: Purpose-Built OS for Containers
+
+Bottlerocket is an open source, Linux-based OS developed by AWS specifically for running containers. It is the recommended node OS for Amazon EKS and a strong security choice in any environment.
+
+### Core security design principles
+
+**1. Read-only root filesystem**
+
+The OS partition is mounted read-only. No process (including root inside a container) can modify the OS binaries, libraries, or configuration.
+
+```
+/  (read-only)          ← OS files, immutable
+├── /etc                ← OS config, read-only
+├── /usr                ← Binaries, read-only
+└── /local              ← Writable, data partition
+    ├── /var            ← Container data, logs
+    └── /opt            ← User data
+```
+
+**2. No package manager**
+
+There is no `apt`, `yum`, `dnf`, or any package manager. It is impossible to install new software on the node at runtime. This eliminates:
+- Post-compromise package installation
+- Dependency confusion attacks on the node
+- Accidental software installation
+
+**3. No interactive shell by default**
+
+SSH is not enabled by default. There is no shell available via normal paths. Accessing the node requires enabling the **admin container** (a privileged, separate container with an SSH server).
+
+```bash
+# To access the node (must be enabled explicitly):
+# 1. Enable admin container via SSM or bootstrap config
+# 2. SSH into the admin container (not the host directly)
+# 3. Use "enter-admin-container" to get a host shell
+```
+
+**4. Atomic (A/B) updates**
+
+Bottlerocket maintains two OS partitions (A and B). Updates apply to the inactive partition, then flip. Rollback is instant — just reboot to the previous partition.
+
+```
+┌─────────────────────────────────────────┐
+│  Disk layout                            │
+├─────────────┬───────────────────────────┤
+│  Partition A│  Partition B              │
+│  (active)   │  (update target)          │
+│  v1.15.0    │  v1.16.0 ← applied here  │
+├─────────────┴───────────────────────────┤
+│  Data partition (writable)              │
+│  /local/var, container data, config     │
+└─────────────────────────────────────────┘
+             ↓ reboot to activate
+┌─────────────────────────────────────────┐
+│  Partition A│  Partition B              │
+│  (fallback) │  (active) v1.16.0        │
+└─────────────────────────────────────────┘
+```
+
+**5. dm-verity (kernel-level integrity)**
+
+Bottlerocket uses Linux `dm-verity` to cryptographically verify the integrity of the OS partition at boot. If any bit of the OS is tampered with, the node will refuse to boot. This prevents persistent rootkits from surviving a reboot.
+
+**6. SELinux enforced**
+
+SELinux is enabled in enforcing mode by default. This provides mandatory access control (MAC) over all processes, including the container runtime. Containers cannot access files or resources outside their defined policy, even if they run as root.
+
+**7. Measured boot and TPM attestation**
+
+Bottlerocket supports measured boot, recording the boot state in the TPM. This enables remote attestation — verifying that a node booted the expected, unmodified OS.
+
+### Architecture: control channel instead of SSH
+
+Management is done through a declarative API, not a shell:
+
+```
+┌──────────────────────────────────────────────┐
+│  Management paths in Bottlerocket            │
+│                                              │
+│  1. apiclient (local, on the node)           │
+│     → UNIX socket to the Bottlerocket API    │
+│                                              │
+│  2. Control container                         │
+│     → Enabled by default                    │
+│     → Lightweight container with apiclient   │
+│     → Access via AWS SSM Session Manager     │
+│                                              │
+│  3. Admin container (disabled by default)    │
+│     → Full shell access (emergency use)      │
+│     → Requires explicit enablement           │
+│     → SSH into the container, then           │
+│        "enter-admin-container" for host ns   │
+└──────────────────────────────────────────────┘
+```
+
+### Bootstrap configuration (user data)
+
+Bottlerocket is configured via TOML in the instance user-data (on AWS), not by running commands:
+
+```toml
+# Bottlerocket node configuration (user data / bootstrap)
+[settings.kubernetes]
+cluster-name = "my-cluster"
+api-server = "https://xxxxx.gr7.us-east-1.eks.amazonaws.com"
+
+[settings.kubernetes.node-labels]
+"node.kubernetes.io/role" = "worker"
+
+[settings.kubernetes.node-taints]
+"dedicated" = "gpu:NoSchedule"
+
+# Enable control container for management via SSM
+[settings.host-containers.control]
+enabled = true
+superpowered = false
+
+# Admin container: disabled by default, enable only when needed
+[settings.host-containers.admin]
+enabled = false
+```
+
+### Using Bottlerocket with EKS managed node groups
+
+```yaml
+# Terraform: EKS managed node group with Bottlerocket
+resource "aws_eks_node_group" "bottlerocket" {
+  cluster_name    = aws_eks_cluster.main.name
+  node_group_name = "bottlerocket-workers"
+  ami_type        = "BOTTLEROCKET_x86_64"  # or BOTTLEROCKET_ARM_64
+
+  scaling_config {
+    desired_size = 3
+    min_size     = 1
+    max_size     = 10
+  }
+
+  # Bottlerocket configuration via launch template
+  launch_template {
+    id      = aws_launch_template.bottlerocket.id
+    version = "$Latest"
+  }
+}
+```
+
+```yaml
+# eksctl cluster configuration with Bottlerocket
+managedNodeGroups:
+  - name: bottlerocket-ng
+    amiFamily: Bottlerocket  # ← specify Bottlerocket
+    instanceType: m5.large
+    minSize: 2
+    maxSize: 10
+    bottlerocket:
+      settings:
+        kubernetes:
+          cluster-dns-ip: "10.100.0.10"
+```
+
+### Security features summary
+
+| Feature | Bottlerocket | Ubuntu | Flatcar | Talos |
+|---|---|---|---|---|
+| Read-only root FS | Yes | No | Yes | Yes |
+| Package manager | No | apt | No | No |
+| Interactive shell | Admin container | Yes | toolbox | No (API only) |
+| Atomic updates | A/B partitions | No | A/B partitions | Yes |
+| SELinux enforced | Yes | Optional | Yes | No (AppArmor-like) |
+| dm-verity | Yes | No | No | Yes |
+| Default SSH | No | Yes | No | No |
+| Managed by | AWS (open source) | Canonical | Kinvolk/Microsoft | Sidero Labs |
+| CIS benchmark | Yes (CIS Bottlerocket) | CIS Ubuntu | CIS Flatcar | N/A |
+
+### When to choose Bottlerocket
+
+**Choose Bottlerocket when:**
+- Running on AWS EKS (native integration, managed AMIs)
+- Security posture requires minimal attack surface on nodes
+- Compliance requirements mandate immutable infrastructure
+- You want atomic updates with instant rollback
+- You need SELinux + dm-verity without manual configuration
+
+**Consider alternatives when:**
+- Need to run non-containerized workloads on nodes (use Ubuntu/Amazon Linux)
+- On-premise or non-AWS cloud (consider Flatcar or Talos)
+- Need maximum control via API-only (consider Talos)
+- Legacy infrastructure that requires SSH-based management tools
+
+### Bottlerocket vs general-purpose OS: security impact
+
+```
+Attack scenario: compromised container escapes to node
+
+General-purpose OS node:
+  Container escape → Root shell on node → Install malware → Persist across reboots
+                                        → Read /etc/shadow → Lateral movement
+                                        → Install backdoor → Modify cron
+
+Bottlerocket node:
+  Container escape → Root shell on admin container (if enabled) → SELinux restricts
+                   → Cannot write to OS partition (dm-verity + read-only)
+                   → Malware removed on reboot (immutable OS)
+                   → No package manager to install tools
+                   → No persistent shell without explicit admin container
+```
+
+---
+
 ## Key Takeaways for the KCSA Exam
 
 - `--anonymous-auth=false` on kube-apiserver is mandatory for security
@@ -481,3 +779,9 @@ kubectl get secrets --all-namespaces | grep service-account-token
 - `kubectl auth can-i --list --as=...` to audit permissions
 - ClusterRole + RoleBinding = namespace-scoped permission (better than ClusterRoleBinding)
 - Legacy tokens (< 1.24): no expiration, stored as Secret. Modern tokens: expirable, projected volume
+- Container-optimized OSes (Bottlerocket, Flatcar, Talos) reduce node attack surface drastically
+- Bottlerocket: read-only root FS + no package manager + no SSH by default + SELinux enforced
+- Bottlerocket uses dm-verity: tampering with the OS partition prevents the node from booting
+- A/B atomic updates: updates apply to inactive partition, reboot activates — instant rollback
+- Bottlerocket is managed via API (apiclient), not SSH; admin container is disabled by default
+- On AWS EKS: `amiFamily: Bottlerocket` (eksctl) or `ami_type: "BOTTLEROCKET_x86_64"` (Terraform)
