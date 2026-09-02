@@ -121,6 +121,27 @@ grype dir:.
 grype nginx:latest -o json > result.json
 ```
 
+### What is an SBOM?
+
+An SBOM (Software Bill of Materials) is a formal, structured inventory of every component that makes up a piece of software — analogous to a food product's list of ingredients. For a container image, it lists OS packages, language dependencies (npm, pip, go modules...), their exact versions, licenses, and file hashes.
+
+**Why it matters for supply chain security:**
+- **Fast vulnerability triage:** when a new CVE is disclosed (e.g., in `log4j` or `openssl`), you can query existing SBOMs to instantly know which images are affected, without re-scanning everything.
+- **Provenance and trust:** an SBOM documents exactly what went into a build, making tampering or unexpected components easier to detect.
+- **Compliance:** several regulations and frameworks (e.g., US Executive Order 14028) require SBOMs for software sold to certain customers.
+- **Attestable artifact:** an SBOM can be signed and attached to an image as an attestation (via Cosign), cryptographically binding "this exact SBOM" to "this exact image digest."
+
+**Common formats:**
+| Format | Maintained by | Notes |
+|---|---|---|
+| SPDX | Linux Foundation | ISO/IEC standard, widely adopted |
+| CycloneDX | OWASP | Designed with security use cases in mind (vuln correlation) |
+
+**Typical SBOM workflow:**
+```
+Build image → Generate SBOM (Syft) → Scan SBOM (Grype) → Sign + attach SBOM as attestation (Cosign) → Store alongside image in registry
+```
+
 ### Syft (SBOM generation)
 
 Syft (also from Anchore) generates SBOMs that can be consumed by Grype:
@@ -616,9 +637,39 @@ outputs:
   prometheus: {}
 ```
 
+### MITRE ATT&CK for Containers
+
+A specialized extension of the general MITRE ATT&CK framework, cataloging **known tactics and techniques attackers use specifically against containerized and Kubernetes environments**.
+
+**Purpose:**
+- **Common language:** standardizes how threats are named and described industry-wide, making security communication consistent
+- **Maps the attack lifecycle** into tactics — Initial Access, Execution, Persistence, Privilege Escalation, Defense Evasion, Credential Access, Discovery, Lateral Movement, Collection, Impact — each with concrete techniques (e.g., "Escape to Host" under Privilege Escalation, "Compromised Image in Registry" under Initial Access)
+- **Guides detection and response:** runtime tools like Falco tag their rules with ATT&CK tactics/techniques (the `mitre_execution` tag seen in the Falco rules above), letting alerts be correlated with known attacker behavior
+- **Guides threat modeling and red teaming:** security teams use the matrix to assess defensive coverage — which techniques are already detected/mitigated, and where are the blind spots
+- **Prioritizes hardening:** justifies specific controls (restrictive RBAC, seccomp, NetworkPolicies) by pointing to exactly which cataloged technique each control mitigates
+
+Unlike STRIDE (a threat *categorization* method used during design), ATT&CK for Containers is a **knowledge base of real-world observed techniques**, more useful for detection engineering and post-hoc threat analysis.
+
 ---
 
 ## Supply Chain Security Concepts (SLSA)
+
+### Common supply chain attack techniques
+
+| Technique | What it is | Example |
+|---|---|---|
+| **Typosquatting** | Publishing a malicious image/package under a name very similar to a popular legitimate one, betting on developer typos | Pulling `kubernets/nginx` instead of `kubernetes/nginx` — the misspelled image may contain a backdoor or crypto-miner |
+| **Dependency confusion** | Publishing a malicious package with the same name as an internal/private package to a public registry with a higher version, tricking the build into pulling the public (malicious) one | Internal package `acme-utils` at v1.2 also published publicly at v9.9.9 — the build tool prefers the "newer" public version |
+| **Compromised base image** | A legitimate, trusted base image is compromised at the source (registry account takeover, build system compromise) | An attacker gains access to a popular base image's publishing pipeline and injects malware into a new tag |
+| **Malicious/backdoored dependency** | A legitimate open source maintainer (or an account that took over their package) ships malicious code in a new release | A widely-used npm/pip package pushes a version that exfiltrates secrets |
+| **CI/CD pipeline compromise** | Attacker gains access to the build system itself, injecting malicious steps or artifacts without touching source code | A compromised CI runner injects a backdoor during the build step, before signing |
+
+**Mitigations (already covered above):**
+- Pin images by **digest** (`@sha256:...`), not just by tag/name — a tag can be re-pointed, a digest cannot
+- Restrict pulls to an **allowlist of trusted registries** via admission controller (OPA/Gatekeeper, Kyverno)
+- Require **image signing** (Cosign) and verify signatures before deploy
+- Generate and review **SBOMs** to know exactly what's inside every image
+- Scan images and dependencies (Trivy, Grype) before they reach production
 
 ### SLSA (Supply-chain Levels for Software Artifacts)
 
@@ -646,6 +697,7 @@ Code → CI/CD → Build → Scan → Sign → Push Registry → Verify → Depl
 
 - Trivy: broad scanner (vulns + misconfigs + secrets + K8s)
 - Grype: focused on vulnerabilities, faster
+- SBOM = structured inventory of a software's components (packages, versions, licenses); formats: SPDX, CycloneDX
 - Syft: SBOM generation, complements Grype
 - Cosign signs images and stores the signature in the registry (as an OCI artifact)
 - Keyless signing uses OIDC + Rekor (public, immutable log)

@@ -41,6 +41,27 @@ The infrastructure layer: the cloud provider (AWS, GCP, Azure) or the on-premise
 - Separate dev and prod into different AWS accounts (AWS Organizations)
 - Expose the Kubernetes API only within the VPC, restricted to specific subnets/CIDRs
 
+### Why unrestricted pod access to the metadata endpoint (169.254.169.254) is dangerous
+
+`169.254.169.254` is the **Instance Metadata Service (IMDS)**, present on every major cloud (AWS, GCP, Azure). It answers plain, **unauthenticated HTTP requests** with data about the instance — most critically, the **temporary IAM/service-account credentials attached to the node** (access key, secret key, session token on AWS; OAuth tokens on GCP).
+
+```
+Pod (compromised via SSRF/RCE) → GET http://169.254.169.254/latest/meta-data/iam/security-credentials/<role>
+                                → Node's IAM role credentials returned, no auth required
+                                → Attacker now holds the node's cloud permissions
+```
+
+**Why it's a risk in Kubernetes specifically:**
+- By default, a pod shares the node's network namespace path to this link-local address — any process in any pod can reach `169.254.169.254` just like the node itself can.
+- If an attacker compromises an application inside a pod (e.g., via SSRF or RCE), they can query the endpoint and **steal the node's IAM role credentials** — which are often broad (ECR pull, S3 access, sometimes even permissions to modify the EKS cluster's `aws-auth` ConfigMap).
+- This escalates "I compromised a container" into "I hold cloud credentials for the whole node," enabling lateral movement to resources outside the cluster entirely.
+
+**Mitigations:**
+- Enforce **IMDSv2** on AWS (requires a session token obtained via `PUT`, which is much harder to trigger through a simple SSRF `GET`)
+- Reduce the **IMDS hop limit to 1** — this blocks access from inside containers, since a pod's traffic to the node's IMDS crosses more than one network hop
+- Block `169.254.169.254` via NetworkPolicy for pods that don't need it
+- Prefer **IRSA (IAM Roles for Service Accounts)** over broad node IAM roles, so pods only get the specific credentials they need instead of inheriting the entire node role
+
 ### Multi-account strategy: isolating environments
 
 Running dev and prod in the same AWS account is a critical risk. A misconfigured IAM role, a leaked credential, or an accidental `kubectl delete` in the wrong context can affect production.
@@ -341,6 +362,16 @@ The application layer: the code running inside the containers.
 - Never hardcode secrets (use environment variables or Vault)
 - Validate and sanitize all inputs
 
+**SAST vs DAST:**
+
+| Aspect | SAST | DAST |
+|---|---|---|
+| Full name | Static Application Security Testing | Dynamic Application Security Testing |
+| What it analyzes | Source code, bytecode, or binary | The running application (black-box) |
+| App running? | No | Yes |
+| When in the pipeline | Early (build/CI, before deploy) | Later (staging/runtime, needs a deployed instance) |
+| Finds | Insecure code patterns, SQLi/XSS-prone code, hardcoded secrets | Exploitable issues reachable via HTTP (real attack simulation) |
+
 ---
 
 ## Shared Responsibility Model in Kubernetes
@@ -455,6 +486,33 @@ Everything from Model 3, plus:    Pod specifications (SecurityContext)
 ```
 
 **Key insight:** Fargate eliminates the node attack surface for you (no SSH to nodes, no node OS to patch). But it does not protect you from a malicious or misconfigured container. RBAC, network policies, and pod security context are still entirely your responsibility.
+
+---
+
+### Soft vs Hard Multi-Tenancy
+
+Multi-tenancy is about how isolated different tenants (teams, customers, business units) are from each other when sharing Kubernetes infrastructure. The key question: **do tenants trust each other?**
+
+**Soft multi-tenancy:**
+- Tenants are isolated **logically** — via Namespaces, RBAC, Network Policies, ResourceQuotas, Pod Security Standards
+- Tenants still **share the same cluster**, the same control plane, and often the same underlying nodes (and kernel)
+- Assumes a degree of **trust** between tenants (e.g., internal teams of the same company) — it protects against accidents and misconfiguration, not against a malicious tenant
+- A container escape or kernel exploit on a shared node can potentially cross tenant boundaries
+- Cheaper and simpler to operate (one cluster to manage)
+
+**Hard multi-tenancy:**
+- Tenants are treated as **mutually untrusted** (e.g., different customers in a SaaS platform)
+- Requires **physical/kernel-level isolation**: dedicated clusters per tenant, dedicated nodes per tenant, or sandboxed runtimes (gVisor, Kata Containers) / microVMs (Firecracker, as used by EKS Fargate) so no kernel is shared between tenants
+- A compromise in one tenant cannot reach another, even via a container escape
+- More expensive and operationally heavier (more clusters/nodes to manage, less bin-packing efficiency)
+
+| Aspect | Soft multi-tenancy | Hard multi-tenancy |
+|---|---|---|
+| Isolation level | Logical (namespace, RBAC, NetworkPolicy) | Physical/kernel (dedicated nodes, clusters, or sandboxed runtime) |
+| Trust assumption | Tenants trust each other | Tenants are mutually untrusted |
+| Shared kernel? | Usually yes | No |
+| Typical use case | Internal teams in one company | SaaS platforms serving external customers |
+| Cost/complexity | Lower | Higher |
 
 ---
 
@@ -596,6 +654,23 @@ apiServer:
     audit-log-path: "/var/log/audit.log"
 ```
 
+### Trust Boundaries
+
+A **trust boundary** is any point in the system where the level of privilege, authenticated identity, or administrative control domain **changes** — where a request or piece of data crosses from one trust context into another that doesn't automatically trust it. It is defined by a change in privilege/identity/control, not by a physical or network limit per se (though the two often coincide).
+
+Trust boundaries are exactly where STRIDE analysis is applied (each STRIDE category represents a way an attacker can illegitimately cross one).
+
+**Key trust boundaries in Kubernetes:**
+
+| Boundary | What changes when crossed |
+|---|---|
+| Container ↔ Node | Isolated container namespace → shared host kernel (crossed via container escape or `privileged: true`) |
+| Pod ↔ kube-apiserver | "Process inside a container" → "authenticated RBAC principal" (via the mounted ServiceAccount token) |
+| Namespace ↔ Namespace | Logical isolation enforced only by RBAC/NetworkPolicy — not a hard boundary by default |
+| kubelet ↔ kube-apiserver | Enforced by the `Node` authorization module — a kubelet should only access resources for its own pods |
+| Cluster ↔ Cloud provider | Crossed when a pod reaches the metadata endpoint (169.254.169.254) and obtains node IAM credentials — leaves the Kubernetes RBAC domain and enters the cloud IAM domain |
+| External user ↔ kube-apiserver | Authentication boundary (client certs, OIDC, tokens) |
+
 ---
 
 ## Threat Modeling with STRIDE
@@ -675,8 +750,21 @@ STRIDE is a framework for systematically identifying threats. Each letter repres
 **Countermeasures:**
 - ResourceQuota and LimitRange per namespace
 - PodDisruptionBudgets
-- Rate limiting on the apiserver
+- API Priority and Fairness (APF) on the apiserver — see below
 - Horizontal Pod Autoscaler
+
+**API Priority and Fairness (APF):** the mechanism that protects the kube-apiserver from being overwhelmed by a client sending excessive requests. Stable since Kubernetes 1.20, it replaced the old flat `--max-requests-inflight` / `--max-mutating-requests-inflight` flags with two CRDs:
+
+- `FlowSchema`: classifies incoming requests (by user, group, ServiceAccount, verb, resource) into a `PriorityLevelConfiguration`
+- `PriorityLevelConfiguration`: caps concurrent requests per priority level, isolating queues (e.g., `system`, `leader-election`, `workload-high`, `workload-low`, `global-default`)
+
+This ensures a single abusive or buggy client (a controller stuck in a retry loop, a flood of requests) cannot exhaust apiserver capacity and starve critical control-plane traffic (`kube-scheduler`, `kube-controller-manager`).
+
+```bash
+# Inspect current FlowSchemas and PriorityLevelConfigurations
+kubectl get flowschemas
+kubectl get prioritylevelconfigurations
+```
 
 ---
 

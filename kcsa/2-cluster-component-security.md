@@ -59,6 +59,19 @@ Client Request
 # Webhook: delegate to an external service
 ```
 
+**All authorization modules supported by kube-apiserver:**
+
+`--authorization-mode` accepts a comma-separated list; modules are evaluated in order until one returns a decision other than `NoOpinion` (deny/allow).
+
+| Module | What it does | Notes |
+|---|---|---|
+| `AlwaysAllow` | Allows every request, no checks | Never use in production |
+| `AlwaysDeny` | Denies every request | Testing only |
+| `ABAC` | Attribute-Based Access Control via a static JSON policy file on disk | Hard to manage/audit, avoid |
+| `RBAC` | Role-Based Access Control via Role/ClusterRole + RoleBinding/ClusterRoleBinding | Recommended default |
+| `Node` | Specialized authorizer restricting kubelets to only the resources of pods scheduled on their own node | Combine with RBAC |
+| `Webhook` | Delegates the authorization decision to an external HTTP(S) service | Used for custom/external policy engines |
+
 **TLS and encryption:**
 ```bash
 # Server certificates
