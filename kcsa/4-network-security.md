@@ -491,6 +491,14 @@ mTLS:
 - Concrete implementation of the SPIFFE identity
 - Usually an X.509 certificate with the SPIFFE URI in the SAN field
 
+**SPIRE (SPIFFE Runtime Environment):**
+- The reference **implementation** of the SPIFFE spec — SPIFFE defines *what* an identity looks like, SPIRE handles *how* it's issued, attested, and rotated in production
+- **Attests** workload identity: verifies *who* is asking for an identity using platform attestation (e.g., confirms a process is really running inside a specific pod by checking Kubernetes metadata like namespace/ServiceAccount/node)
+- **Issues and distributes SVIDs** (X.509 certs or JWTs) automatically to workloads
+- **Rotates** credentials automatically with short TTLs, no manual intervention
+- Architecture: **SPIRE Server** (central authority, manages the trust domain and attestation policies) + **SPIRE Agents** (run on each node, attest local workloads, deliver SVIDs via a local API)
+- This is the identity layer service meshes like Istio build on to automate mTLS between services
+
 ### Security policies with Istio
 
 ```yaml

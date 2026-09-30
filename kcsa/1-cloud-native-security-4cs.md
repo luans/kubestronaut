@@ -677,6 +677,26 @@ Trust boundaries are exactly where STRIDE analysis is applied (each STRIDE categ
 
 STRIDE is a framework for systematically identifying threats. Each letter represents a threat category.
 
+### Risk of a compromised CoreDNS
+
+CoreDNS resolves internal names like `<service>.<namespace>.svc.cluster.local` to pod/service IPs. Because the **entire cluster blindly trusts DNS responses** to discover and reach other services, a compromised CoreDNS is severe:
+
+- **DNS spoofing / cache poisoning → man-in-the-middle**: the attacker alters DNS answers to redirect traffic meant for a legitimate service (e.g., `payment-service.prod.svc.cluster.local`) to a malicious pod, intercepting or tampering with data in transit — the client application sees nothing wrong, it just resolved a name
+- **Credential/secret harvesting**: if applications send tokens, DB credentials, or API keys to what they believe is the legitimate endpoint, the attacker passively captures everything
+- **NetworkPolicy bypass**: policies are usually written against `podSelector`/`namespaceSelector`, not raw IPs — if DNS silently redirects traffic to an IP that's already inside the allowed scope (another compromised pod in the same namespace), the policy provides no protection
+- **Denial of service**: incorrect DNS answers or CoreDNS going down breaks service discovery cluster-wide — nearly all internal communication stops working
+- **DNS tunneling / data exfiltration**: a compromised CoreDNS (or a malicious `Corefile`/plugin) can be used as a covert channel to exfiltrate data via DNS queries, bypassing HTTP-based egress filtering
+- **RBAC inheritance**: CoreDNS's ServiceAccount typically has `list`/`watch` on `services`, `endpoints`, and `pods` cluster-wide (required for DNS resolution) — a compromise hands the attacker full visibility into the cluster's service topology
+
+**Mitigations:**
+- Least-privilege RBAC for the CoreDNS ServiceAccount
+- Run CoreDNS with a hardened `securityContext` (non-root, `readOnlyRootFilesystem`, no extra capabilities)
+- Restrict who can edit the `coredns` ConfigMap in `kube-system` — it's a direct tampering target
+- Audit/alert on changes to the `Corefile`
+- Use mTLS via a service mesh for service-to-service auth, so identity doesn't rely solely on DNS/IP (defense in depth if DNS is compromised)
+
+---
+
 ### S - Spoofing
 **What it is:** An attacker impersonates another entity.
 
@@ -699,12 +719,36 @@ STRIDE is a framework for systematically identifying threats. Each letter repres
 - Modifying manifests in etcd
 - Altering images in the registry
 - Modifying ConfigMaps or Secrets
+- Dropping a static pod manifest into a node's filesystem (see below)
 
 **Countermeasures:**
 - Restrictive RBAC (who can write to resources)
 - etcd encryption at rest
 - Admission controllers to validate resources
 - Image signing and verification at deploy time
+- Restrict filesystem write access to `/etc/kubernetes/manifests` on every node
+
+**Static pods and `/etc/kubernetes/manifests`:**
+
+The kubelet continuously watches the directory set by `--pod-manifest-path` (default `/etc/kubernetes/manifests`) for pod manifests. Any file dropped there is automatically turned into a **Static Pod**, created **directly by the kubelet** — bypassing the kube-apiserver entirely, so it skips RBAC, admission controllers (OPA/Gatekeeper, Kyverno), and Pod Security Admission.
+
+```
+Attacker with node filesystem write access
+        │
+        ▼
+writes pod-manifest.yaml → /etc/kubernetes/manifests/
+        │
+        ▼
+kubelet detects the new file → creates the pod directly (no apiserver, no RBAC, no admission control)
+```
+
+**Consequences of an attacker doing this:**
+- Creates an arbitrary, potentially **privileged pod** entirely **outside control-plane oversight** — no RBAC check, no policy engine can block it
+- **Persistence**: if the pod is deleted or the kubelet restarts, it's automatically recreated from the manifest still on disk
+- A manifest using `hostNetwork: true`, `hostPID: true`, a hostPath mount of `/`, or `privileged: true` grants full node control — and, if the node has broad cloud IAM permissions, potentially the wider cloud environment too
+- The apiserver creates a read-only **mirror pod** to reflect it (visible via `kubectl get pods`, but not manageable/deletable through the API — `kubectl delete` only removes the mirror, the kubelet recreates it from disk)
+
+This is also why control-plane nodes are especially sensitive: in kubeadm clusters, `/etc/kubernetes/manifests` is exactly where the kube-apiserver, controller-manager, scheduler, and etcd manifests themselves live — reinforcing why node filesystem access must be tightly restricted (no direct SSH, no exposed IMDS, least-privilege node IAM roles).
 
 ---
 
@@ -746,11 +790,13 @@ STRIDE is a framework for systematically identifying threats. Each letter repres
 - A pod consuming all node resources (CPU/memory)
 - Request flood to the kube-apiserver
 - A container filling the node disk with logs
+- A fork bomb inside a container exhausting the node's PID table
 
 **Countermeasures:**
 - ResourceQuota and LimitRange per namespace
 - PodDisruptionBudgets
 - API Priority and Fairness (APF) on the apiserver — see below
+- PID limits per pod (see below) to mitigate fork bombs
 - Horizontal Pod Autoscaler
 
 **API Priority and Fairness (APF):** the mechanism that protects the kube-apiserver from being overwhelmed by a client sending excessive requests. Stable since Kubernetes 1.20, it replaced the old flat `--max-requests-inflight` / `--max-mutating-requests-inflight` flags with two CRDs:
@@ -765,6 +811,12 @@ This ensures a single abusive or buggy client (a controller stuck in a retry loo
 kubectl get flowschemas
 kubectl get prioritylevelconfigurations
 ```
+
+**PID limits (mitigating fork bombs):** `ResourceQuota` and `LimitRange` for CPU/memory do **not** protect against a fork bomb — `fork()` is cheap per individual call, so a fork loop can exhaust the node's **global PID table** (shared across all pods on the node) long before any CPU/memory limit is hit, causing a denial of service for the **entire node**, not just the offending container.
+
+- **`--pod-max-pids`** (or `podPidsLimit` in `KubeletConfiguration`): caps the number of PIDs a single pod can create, enforced via the Linux `pids` cgroup controller
+- **`--system-reserved=pid=<N>`** / **`--kube-reserved=pid=<N>`**: reserve PIDs for OS and Kubernetes system processes, isolating them from what pods can consume
+- **PID pressure eviction**: the kubelet monitors `pid.available` as an eviction signal — under PID pressure, it evicts pods to protect node stability
 
 ---
 
